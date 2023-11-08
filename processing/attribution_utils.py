@@ -1,7 +1,10 @@
 import numpy
 import torch
 
+import config
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+import numpy as np
 
 
 def gradient_attributions(inputs_embeds, attention_mask, target_idx, model, logit_fn, x_inputs=False):
@@ -70,3 +73,64 @@ def ig_attributions(inputs_embeds, attention_mask, target_idx, baseline, model, 
 
 def _ig_interpolate_samples(baseline, target, steps):
     return [(baseline + (float(i) / steps) * (target - baseline)).to('cpu') for i in range(0, steps + 1)]
+
+
+def format_attrs(attrs):
+    if len(attrs.shape) == 3:
+        attrs = torch.mean(attrs, dim=2)
+
+    if len(attrs.shape) == 2 and attrs.shape[0] == 1:
+        attrs = torch.squeeze(attrs)
+
+    attrs_list = attrs.tolist()
+
+    return attrs_list[1:len(attrs) - 1]  # leave out cls and sep
+
+
+def embed_input_ids(input_ids, embeddings):
+    input_embeds = torch.unsqueeze(torch.index_select(embeddings, 0, torch.squeeze(input_ids).to(device)), 0).requires_grad_(True).to(device)
+    return input_embeds
+
+
+def filter_attributions(attributions, top_percent):
+    attributions = [0 if a < 0 else a for a in attributions]
+    lower_percentile = np.percentile(attributions, 100 - top_percent)
+    attributions = [0 if a < lower_percentile else a for a in attributions]
+
+    return attributions
+
+
+def extract_relevant_sentences(attributions, word_ids, fraction_hit, depth):
+    print(depth)
+    sentence_count = len(list(set(word_ids)))
+
+    sentence_lengths = [0 for _ in range(sentence_count)]
+    sentence_hits = [0 for _ in range(sentence_count)]
+    for sentence_id in range(sentence_count):
+        for i in range(len(word_ids)):
+            if word_ids[i] == sentence_id:
+                sentence_lengths[sentence_id] += 1
+                if attributions[i] != 0:
+                    sentence_hits[sentence_id] += 1
+
+    rationale_sentences = []
+    for i, (length, hits) in enumerate(zip(sentence_lengths, sentence_hits)):
+        if hits / length >= fraction_hit:
+            rationale_sentences.append(i)
+
+    if config.RATIONALES_RECURSE:
+        if depth == -1:
+            return None
+        if len(rationale_sentences) > config.MAX_RATIONALES:
+            new = extract_relevant_sentences(attributions, word_ids, fraction_hit + 0.025, depth - 1)
+        elif len(rationale_sentences) < config.MIN_RATIONALES:
+            new = extract_relevant_sentences(attributions, word_ids, fraction_hit - 0.025, depth - 1)
+        else:
+            return rationale_sentences
+
+        if not new:
+            return rationale_sentences
+        else:
+            return new
+
+    return rationale_sentences

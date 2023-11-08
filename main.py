@@ -5,6 +5,7 @@ from processing import attribution
 import config
 import transformers
 import torch
+import nltk
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -14,10 +15,11 @@ app = FastAPI()
 model = transformers.AutoModelForSequenceClassification.from_pretrained(config.MODEL_FILE).to(device)
 tokenizer = transformers.AutoTokenizer.from_pretrained(config.MODEL_FILE)
 
+nltk.download('punkt')
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "It works!"}
 
 
 @app.post("/classify")
@@ -30,5 +32,9 @@ async def classify(page: Page) -> Classification | Message:
 
 
 @app.post("/rationale")
-async def attribute(page: Page) -> Rationales:
-    return Rationales(rationales=attribution.rationales(page.text))
+async def attribute(page: Page) -> Rationales | Message:
+    rationales = attribution.rationales(page.text, model, tokenizer)
+    if rationales is None:
+        return Message(code=501, message='The passed HTML contains no plain text')
+    else:
+        return Rationales(rationales=rationales)
