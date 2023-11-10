@@ -4,6 +4,7 @@ from typing import List
 
 class Page(BaseModel):
     text: str
+    url: str
 
 
 class Classification(BaseModel):

@@ -1,10 +1,9 @@
-import numpy
+import numpy as np
 import torch
 
-import config
+from api.config import Config
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-import numpy as np
 
 
 def gradient_attributions(inputs_embeds, attention_mask, target_idx, model, logit_fn, x_inputs=False):
@@ -57,8 +56,8 @@ def ig_attributions(inputs_embeds, attention_mask, target_idx, baseline, model, 
         return integrated_gradients
     else:
         # scale the [-1, 1] interval to [0, 1]
-        weights = list(0.5 * numpy.polynomial.legendre.leggauss(steps)[1])
-        alphas = list(0.5 * (1 + numpy.polynomial.legendre.leggauss(steps)[0]))
+        weights = list(0.5 * np.polynomial.legendre.leggauss(steps)[1])
+        alphas = list(0.5 * (1 + np.polynomial.legendre.leggauss(steps)[0]))
 
         interpolated_samples = [(baseline + alpha * (inputs_embeds - baseline)).to('cpu') for alpha in alphas]
         total_grads = 0
@@ -118,12 +117,12 @@ def extract_relevant_sentences(attributions, word_ids, fraction_hit, depth):
         if hits / length >= fraction_hit:
             rationale_sentences.append(i)
 
-    if config.RATIONALES_RECURSE:
+    if Config.RATIONALES_RECURSE:
         if depth == -1:
             return None
-        if len(rationale_sentences) > config.MAX_RATIONALES:
+        if len(rationale_sentences) > Config.MAX_RATIONALES:
             new = extract_relevant_sentences(attributions, word_ids, fraction_hit + 0.025, depth - 1)
-        elif len(rationale_sentences) < config.MIN_RATIONALES:
+        elif len(rationale_sentences) < Config.MIN_RATIONALES:
             new = extract_relevant_sentences(attributions, word_ids, fraction_hit - 0.025, depth - 1)
         else:
             return rationale_sentences
