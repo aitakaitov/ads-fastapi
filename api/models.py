@@ -41,3 +41,19 @@ class Rationale(Base):
     page_url = Column(String(2000), ForeignKey('pages.url'), index=True)
 
     page = relationship('PageInfo', back_populates='rationales')
+
+
+class DomainUrl(Base):
+    __tablename__ = 'domain_cache'
+
+    domain = Column(
+        'domain',
+        String(2500),
+        unique=True,
+        primary_key=True
+    )
+
+    cookie_url = Column(
+        'cookie_url',
+        String(2500),
+    )

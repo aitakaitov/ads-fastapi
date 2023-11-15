@@ -18,3 +18,11 @@ class Rationales(BaseModel):
 class Message(BaseModel):
     code: int
     message: str
+
+
+class DomainCacheRequest(BaseModel):
+    url: str
+
+
+class DomainCacheResponse(BaseModel):
+    url: str

@@ -16,4 +16,11 @@ The server inside the container runs on <code>0.0.0.0:8001</code>.
 
 <code>POST /rationale</code> : returns rationales if a page is already classified
 
+<code>POST /domains/{domain}</code> : add cookies URL for a domain
+
+<code>GET /domains/{domain}</code> : get cookies URL of a domain
+
+<code>PUT /domains/{domain}</code> : set new cookies url for a domain
+
+
 See SwaggerDoc at <code>address:port/docs#</code>
