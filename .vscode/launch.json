@@ -12,7 +12,8 @@
             "args": [
                 "api.main:app",
                 "--port",
-                "8001"
+                "8002",
+                "--reload"
             ],
             "jinja": true,
             "justMyCode": true

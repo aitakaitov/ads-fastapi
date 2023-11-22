@@ -14,6 +14,7 @@ from fastapi import FastAPI, Depends, HTTPException
 import transformers
 import torch
 import nltk
+import spacy
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -48,13 +49,14 @@ async def classify(page: Page, db: Session = Depends(get_db)):
     Returns the classification of a page
 
     Caches the classification for future use
-    
+
     Future requests for a classified page will return the cached classification
 
     If no text can be extracted from the page, returns 400
     """
     page_info = crud.get_page(db, page.url)
     if page_info:
+        print(f'classification: {page_info.is_advertisement}')
         return Classification(is_advertisement=page_info.is_advertisement)
 
     cls = classification.classify(page.text, model, tokenizer)
@@ -62,6 +64,7 @@ async def classify(page: Page, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail='Page HTML contains no plain text')
     else:
         crud.add_page(db, is_advertisement=cls, url=page.url)
+        print(f'classification: {cls}')
         return Classification(is_advertisement=cls)
 
 
@@ -91,7 +94,9 @@ async def attribute(page: Page, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail='Page HTML contains no plain text')
     else:
         crud.add_rationales(db, rationales=rationales, url=page.url)
-        return Rationales(rationales=[r.text for r in rationales])
+        for r in rationales:
+            print(r)
+        return Rationales(rationales=rationales)
     
 
 @app.post("/domains/{domain}")

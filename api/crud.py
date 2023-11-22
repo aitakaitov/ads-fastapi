@@ -9,7 +9,7 @@ def get_page(db: Session, url: str) -> models.PageInfo | None:
 
 
 def add_page(db: Session, is_advertisement: bool, url: str) -> models.PageInfo:
-    page_info = models.PageInfo(url=url, id_advertisement=is_advertisement)
+    page_info = models.PageInfo(url=url, is_advertisement=is_advertisement)
     db.add(page_info)
     db.commit()
     db.refresh(page_info)

@@ -20,6 +20,7 @@ WORKDIR /fastapi-server
 # someone really wants me to use venv, but I can't be bothered 
 RUN rm -rf /usr/lib/python3.11/EXTERNALLY-MANAGED
 RUN python3 -m pip install -r requirements.txt
+RUN python3 -m spacy download xx_sent_ud_sm
 
 # entrypoint
 ENTRYPOINT [ "uvicorn", "api.main:app", "--port", "8001", "--host", "0.0.0.0" ]
