@@ -86,8 +86,9 @@ async def attribute(page: Page, db: Session = Depends(get_db)):
     if rationales is None:
         raise HTTPException(status_code=400, detail='URL has not been classified yet')
 
-    if len(rationales) > 0:
-        return Rationales(rationales=[r.text for r in rationales])
+    #if len(rationales) > 0:
+    #    print([r.text for r in rationales])
+    #    return Rationales(rationales=[r.text for r in rationales])
     
     rationales = attribution.rationales(page.text, model, tokenizer)
     if rationales is None:
