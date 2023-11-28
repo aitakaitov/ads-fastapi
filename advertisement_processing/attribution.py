@@ -1,18 +1,18 @@
-from processing.attribution_utils import *
-from processing.html_utils import html_to_plaintext
+from advertisement_processing.attribution_utils import *
+from utils.html_utils import html_to_plaintext
 import nltk
 import torch
 import re
 from api.config import Config
 
-from processing.model_utils import split_into_blocks, get_cls_sep, get_embeddings
+from advertisement_processing.model_utils import split_into_blocks, get_cls_sep, get_embeddings
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 logit_fn = torch.nn.Softmax(dim=1)
 regexp = re.compile('\\s\\s\\s+')
 
 def rationales(html, model, tokenizer):
-    text = html_to_plaintext(html, keep_paragraphs_only=True, trim_start=Config.TRIM_LENGTH,
+    text = html_to_plaintext(html, keep_paragraphs_only=True, trim_start=0,#Config.TRIM_LENGTH,
                              lowercase=False, merge_whitespaces=False)
     result = generate_rationales(text, model, tokenizer)
     result = postprocess_rationales(result)

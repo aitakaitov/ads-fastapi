@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, PickleType
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -20,6 +20,11 @@ class PageInfo(Base):
     )
 
     rationales = relationship('Rationale', back_populates='page')
+
+    minhash = Column(
+        'minhash',
+        PickleType()
+    )
 
 
 class Rationale(Base):

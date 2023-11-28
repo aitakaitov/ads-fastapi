@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 
+from utils.document_similarity import document_to_minhash, are_documents_same
+
 from .schemas import *
 from .config import Config
 
@@ -7,14 +9,14 @@ from . import models
 from .database import SessionLocal, engine
 from . import crud
 
-from processing import classification
-from processing import attribution
+from advertisement_processing import classification
+from advertisement_processing import attribution
 
+from utils.pickle_utils import from_binary_string
 from fastapi import FastAPI, Depends, HTTPException
 import transformers
 import torch
 import nltk
-import spacy
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -54,17 +56,27 @@ async def classify(page: Page, db: Session = Depends(get_db)):
 
     If no text can be extracted from the page, returns 400
     """
+    # check if the page is cac1hed
     page_info = crud.get_page(db, page.url)
     if page_info:
-        print(f'classification: {page_info.is_advertisement}')
+        print('classify - cached')
+        # if it is, check if the page changed - if it did, update the minhash and is_advertisement stuff
+        # then delete all rationales and force new ones on next request
+        minhash = document_to_minhash(page.text)
+        if not are_documents_same(minhash, page_info.minhash):
+            print('documents not same')
+            cls, minhash = classification.classify(page.text, model, tokenizer)
+            crud.update_page_invalidate_rationales(db, page_info, cls, minhash)
+            return Classification(is_advertisement=cls)
+
+        print('documents same')
         return Classification(is_advertisement=page_info.is_advertisement)
 
-    cls = classification.classify(page.text, model, tokenizer)
+    cls, minhash = classification.classify(page.text, model, tokenizer)
     if cls is None:
         raise HTTPException(status_code=400, detail='Page HTML contains no plain text')
     else:
-        crud.add_page(db, is_advertisement=cls, url=page.url)
-        print(f'classification: {cls}')
+        crud.add_page(db, is_advertisement=cls, url=page.url, minhash=minhash)
         return Classification(is_advertisement=cls)
 
 
@@ -86,19 +98,21 @@ async def attribute(page: Page, db: Session = Depends(get_db)):
     if rationales is None:
         raise HTTPException(status_code=400, detail='URL has not been classified yet')
 
-    #if len(rationales) > 0:
-    #    print([r.text for r in rationales])
-    #    return Rationales(rationales=[r.text for r in rationales])
-    
-    rationales = attribution.rationales(page.text, model, tokenizer)
+    if len(rationales) == 0:
+        rationales = attribution.rationales(page.text, model, tokenizer)
+
     if rationales is None:
         raise HTTPException(status_code=400, detail='Page HTML contains no plain text')
     else:
+        # check cache
+
+
         crud.add_rationales(db, rationales=rationales, url=page.url)
-        for r in rationales:
-            print(r)
         return Rationales(rationales=rationales)
-    
+
+
+# ----------------------------------------- DOMAIN-URL CACHE -----------------------------------------
+
 
 @app.post("/domains/{domain}")
 async def add_domain_cookies(request: DomainCacheRequest, domain: str, db: Session = Depends(get_db)):
