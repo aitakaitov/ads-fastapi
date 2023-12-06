@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup, NavigableString
 import re
+import bleach
 
 
 def filter_html(soup: BeautifulSoup):
@@ -82,3 +83,38 @@ def html_to_plaintext(html, keep_paragraphs_only=False, trim_start=None, lowerca
         soup_text = re.sub('\\s+', ' ', soup_text)
 
     return soup_text
+
+
+allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+def html_to_text_keep_p_h_tags(html):
+    cleaned = bleach.clean(
+        html,
+        tags=allowed_tags,
+        attributes=[],
+        strip=True
+    )
+
+    text = cleaned
+    text = re.sub('\\n+', '\n', text)
+    text = re.sub('\\t+', '\t', text)
+    text = re.sub('<p>', '\nPPPPPS\n', text)
+    text = re.sub('</p>', '\nPPPPPE\n', text)
+
+    for tag in allowed_tags[1:]:
+        text = re.sub(f'<{tag}>', '\nHHHHHS\n', text)
+        text = re.sub(f'</{tag}>', '\nHHHHHE\n', text)
+    
+    return text
+
+
+if __name__ == '__main__':
+    import os
+
+    for file in os.listdir('cookies'):
+        with open(f'cookies/{file}', 'r', encoding='utf-8') as f:
+            html = f.read()
+
+        cleaned = html_to_text_keep_p_h_tags(html)
+        
+        with open(f'cookies/{file}.processed', 'w+', encoding='utf-8') as f:
+            f.write(cleaned)    

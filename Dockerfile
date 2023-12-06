@@ -3,8 +3,9 @@ FROM debian:latest
 # copy scripts to image
 RUN mkdir fastapi-server
 ADD api fastapi-server/api
-ADD processing fastapi-server/processing
+ADD advertisement_processing fastapi-server/advertisement_processing
 ADD small-e-czech-ads fastapi-server/small-e-czech-ads
+ADD utils fastapi-server/utils
 COPY requirements.txt fastapi-server/requirements.txt 
 
 # install python
