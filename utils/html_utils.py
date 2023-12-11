@@ -86,7 +86,7 @@ def html_to_plaintext(html, keep_paragraphs_only=False, trim_start=None, lowerca
 
 
 allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
-def html_to_text_keep_p_h_tags(html):
+def html_to_text_keep_p_h_tags(html, add_outside_to_par=False):
     cleaned = bleach.clean(
         html,
         tags=allowed_tags,
@@ -104,6 +104,37 @@ def html_to_text_keep_p_h_tags(html):
         text = re.sub(f'<{tag}>', '\nHHHHHS\n', text)
         text = re.sub(f'</{tag}>', '\nHHHHHE\n', text)
     
+    if add_outside_to_par:
+        lines = text.split('\n')
+
+        new_lines = []
+        segment_lines = []
+        found_begin = False
+        for line in lines:
+            if "PPPPPS" in line:
+                if len(segment_lines) == 0 or not found_begin:
+                    segment_lines.append(line)
+                    found_begin = True
+
+                else:
+                    new_lines.extend(segment_lines)
+                    new_lines.append("PPPPPE")
+                    segment_lines = ["PPPPPS"]
+                    found_begin = False
+
+            elif "PPPPPE" in line:
+                continue
+            else:
+                segment_lines.append(line)
+
+        if len(segment_lines) != 0:
+            if segment_lines[-1] != "PPPPPE":
+                segment_lines.append("PPPPPE")
+            new_lines.extend(segment_lines)
+            
+
+        text = '\n'.join(new_lines)
+
     return text
 
 
