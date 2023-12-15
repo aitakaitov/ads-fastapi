@@ -161,7 +161,105 @@ def process_for_extraction(html):
     }
 
 
+def find_token_sequence_in_element(element, tokens, element_tokens = [], token_elements = []):
+    for child in element.children:
+        if isinstance(child, bs4.NavigableString):
+            string = str(child)
+            split = string.split()
+            for t in split:
+                if t.isspace() or t == '' or t == '\n':
+                    continue
+                if not t[-1].isalnum():
+                    element_tokens.append(t[:-1])
+                    element_tokens.append(t[-1])
+                    token_elements.append(child)
+                    token_elements.append(child)
+                else:
+                    element_tokens.append(t)
+                    token_elements.append(child)
+        elif child.name is not None:
+            find_token_sequence_in_element(child, tokens, element_tokens, token_elements)    
+    
+    return element_tokens, token_elements
+
+
+def get_range_in_element(element, tokens):
+    element_tokens, token_elements = find_token_sequence_in_element(element, tokens)
+    tokens_set = set(tokens)
+    max_overlap_index = 0
+    max_jaccard = 0
+    for i in range(0, len(element_tokens) - len(tokens)):
+        temp_set = set(element_tokens[i:len(tokens)])
+        jacc = len(temp_set.intersection(tokens_set)) / len(temp_set.union(tokens_set))
+        if jacc > max_jaccard:
+            max_overlap_index = i
+            max_jaccard = jacc
+            if jacc == 1.0:
+                break
+    
+    # TODO
+    # figure out how to identify starting and ending elements
+    # figure out how to calculate offset from start of element
+    # maybe wrap the start and end text elements in spans and give them attributes?
+
+    starting_element = token_elements[max_overlap_index].parent
+    ending_element = token_elements[max_overlap_index + len(tokens)].parent
+
+    SPAN_LENGTH = 2
+
+    start_text = ''
+    for i in range(SPAN_LENGTH):
+        if i == 0:
+            start_text = tokens[i]
+        elif tokens[i].isalnum():
+            start_text += ' ' + tokens[i]
+        else:
+            start_text += tokens[i]
+
+    end_text = ''
+    for i in range(SPAN_LENGTH):
+        if i == 0:
+            end_text = tokens[-SPAN_LENGTH]
+        elif tokens[-SPAN_LENGTH + i].isalnum():
+            end_text += ' ' + tokens[-SPAN_LENGTH + i]
+        else:
+            end_text += tokens[-SPAN_LENGTH + i]
+
+    starting_offset = str(token_elements[max_overlap_index]).index(start_text)
+    ending_offset = str(token_elements[max_overlap_index + len(tokens)]).index(end_text, starting_offset + int(sum([len(t) for t in tokens]) * max_jaccard)) + len(end_text)
+
+    
+    return {
+        'start_element': starting_element,
+        'start_offset': starting_offset,
+        'end_element': ending_element,
+        'end_offset': ending_offset
+    }
+
+
 def download_html_from_url(url):
     response = urllib3.request.urlopen(url)
     content = response.read().decode('UTF-8')
     return content
+
+if __name__ == '__main__':
+    test_html = """
+<html>
+    <body>
+        <p>
+            Lorem ipsum dolor <span>sit</span> amet, consectetuer adipiscing elit. Etiam quis quam. Duis viverra diam non justo. Mauris dictum facilisis augue.
+        </p>
+        <div>asdasd</div>
+        <p>
+            Fusce dui leo, imperdiet in, aliquam sit amet, feugiat eu, orci. Nullam eget nisl.
+        </p>
+        <p>
+            Nullam eget nisl. <i>Nemo enim ipsam</i> voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
+        </p>
+    </body>
+</html>
+"""
+    processed = process_for_extraction(test_html)
+    tokens_to_find = ["Lorem", "ipsum", "dolor", "sit", "amet", ",", "consectetuer"]
+    data = get_range_in_element(processed['id_element_map'][0], tokens_to_find)
+
