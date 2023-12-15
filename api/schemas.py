@@ -7,6 +7,10 @@ class Page(BaseModel):
     url: str
 
 
+class Url(BaseModel):
+    url: str
+
+
 class Classification(BaseModel):
     is_advertisement: bool
 
@@ -26,3 +30,23 @@ class DomainCacheRequest(BaseModel):
 
 class DomainCacheResponse(BaseModel):
     url: str
+
+
+class PageToRender(BaseModel):
+    html: str
+
+
+class EntityInfo(BaseModel):
+    short_text: str
+    entity: str
+
+
+class CookiesAnalysis(BaseModel):
+    url: str
+    entities: list[EntityInfo]
+    page_to_render: PageToRender
+
+
+class SelectEntityRequest(BaseModel):
+    url: str
+    selected_entity: str

@@ -44,6 +44,32 @@ async def root():
     """
     return {"message": "It works!"}
 
+# ----------------------------------------- COOKIES -----------------------------------------
+
+@app.post("/cookies/analyze", response_model=CookiesAnalysis)
+async def analyze(url: Url, db: Session = Depends(get_db)):
+    """
+    Given a URL, downloads and analyzes the page. 
+    
+    If the page is cached, compares the page to the cached version and redoes the analysis if needed.
+    
+    Returns a list of entities with their associated short texts, and HTML to render (incl. a sidebar and JS code)
+    """
+    # TODO
+    ...
+
+
+@app.post("/cookies/select", response_model=CookiesAnalysis)
+async def analyze(request: SelectEntityRequest, db: Session = Depends(get_db)):
+    """
+    Given page URL and the name of the selected entity, returns a re-rendered page
+
+    If the page is not cached (it should be), returns 400
+    """
+    # TODO
+    ...    
+
+# ----------------------------------------- ADS CLASSIFICATION, RATIONALES -----------------------------------------
 
 @app.post("/classify", response_model=Classification)
 async def classify(page: Page, db: Session = Depends(get_db)):
@@ -104,9 +130,6 @@ async def attribute(page: Page, db: Session = Depends(get_db)):
     if rationales is None:
         raise HTTPException(status_code=400, detail='Page HTML contains no plain text')
     else:
-        # check cache
-
-
         crud.add_rationales(db, rationales=rationales, url=page.url)
         return Rationales(rationales=rationales)
 

@@ -1,6 +1,11 @@
 from bs4 import BeautifulSoup, NavigableString
 import re
 import bleach
+import bs4
+import urllib3
+
+
+ELEMENT_ID_ATTRIBUTE = 'vilda-element-id'
 
 
 def filter_html(soup: BeautifulSoup):
@@ -85,67 +90,78 @@ def html_to_plaintext(html, keep_paragraphs_only=False, trim_start=None, lowerca
     return soup_text
 
 
-allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
-def html_to_text_keep_p_h_tags(html, add_outside_to_par=False):
-    cleaned = bleach.clean(
-        html,
-        tags=allowed_tags,
-        attributes=[],
-        strip=True
-    )
+def xpath_soup(element):
+    # type: (typing.Union[bs4.element.Tag, bs4.element.NavigableString]) -> str
+    """
+    Generate xpath from BeautifulSoup4 element.
+    :param element: BeautifulSoup4 element.
+    :type element: bs4.element.Tag or bs4.element.NavigableString
+    :return: xpath as string
+    :rtype: str
+    Usage
+    -----
+    >>> import bs4
+    >>> html = (
+    ...     '<html><head><title>title</title></head>'
+    ...     '<body><p>p <i>1</i></p><p>p <i>2</i></p></body></html>'
+    ...     )
+    >>> soup = bs4.BeautifulSoup(html, 'html.parser')
+    >>> xpath_soup(soup.html.body.p.i)
+    '/html/body/p[1]/i'
+    >>> import bs4
+    >>> xml = '<doc><elm/><elm/></doc>'
+    >>> soup = bs4.BeautifulSoup(xml, 'lxml-xml')
+    >>> xpath_soup(soup.doc.elm.next_sibling)
+    '/doc/elm[2]'
+    """
+    components = []
+    child = element if element.name else element.parent
+    for parent in child.parents:  # type: bs4.element.Tag
+        siblings = parent.find_all(child.name, recursive=False)
+        components.append(
+            child.name if 1 == len(siblings) else '%s[%d]' % (
+                child.name,
+                next(i for i, s in enumerate(siblings, 1) if s is child)
+                )
+            )
+        child = parent
+    components.reverse()
+    return '/%s' % '/'.join(components)
 
-    text = cleaned
-    text = re.sub('\\n+', '\n', text)
-    text = re.sub('\\t+', '\t', text)
-    text = re.sub('<p>', '\nPPPPPS\n', text)
-    text = re.sub('</p>', '\nPPPPPE\n', text)
 
-    for tag in allowed_tags[1:]:
-        text = re.sub(f'<{tag}>', '\nHHHHHS\n', text)
-        text = re.sub(f'</{tag}>', '\nHHHHHE\n', text)
+def _clean_text(text):
+    return re.sub('\\s+', ' ', text)
+
+
+allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']
+def process_for_extraction(html):
+    soup = bs4.BeautifulSoup(html)
+    relevant_elements = soup.find_all(allowed_tags)
+
+    id_to_element = {
+        i: el for i, el in enumerate(relevant_elements)
+    }
+
+    for i, el in id_to_element.items():
+        el[ELEMENT_ID_ATTRIBUTE] = i
     
-    if add_outside_to_par:
-        lines = text.split('\n')
+    id_text_list = [
+        {
+            'id': i,
+            'text': _clean_text(el.get_text()),
+            'tag': el.tag
+        }
+        for i, el in id_to_element.items()
+    ]
 
-        new_lines = []
-        segment_lines = []
-        found_begin = False
-        for line in lines:
-            if "PPPPPS" in line:
-                if len(segment_lines) == 0 or not found_begin:
-                    segment_lines.append(line)
-                    found_begin = True
-
-                else:
-                    new_lines.extend(segment_lines)
-                    new_lines.append("PPPPPE")
-                    segment_lines = ["PPPPPS"]
-                    found_begin = False
-
-            elif "PPPPPE" in line:
-                continue
-            else:
-                segment_lines.append(line)
-
-        if len(segment_lines) != 0:
-            if segment_lines[-1] != "PPPPPE":
-                segment_lines.append("PPPPPE")
-            new_lines.extend(segment_lines)
-            
-
-        text = '\n'.join(new_lines)
-
-    return text
+    return {
+        'soup': soup,
+        'texts': id_text_list,
+        'id_element_map': id_to_element 
+    }
 
 
-if __name__ == '__main__':
-    import os
-
-    for file in os.listdir('cookies'):
-        with open(f'cookies/{file}', 'r', encoding='utf-8') as f:
-            html = f.read()
-
-        cleaned = html_to_text_keep_p_h_tags(html)
-        
-        with open(f'cookies/{file}.processed', 'w+', encoding='utf-8') as f:
-            f.write(cleaned)    
+def download_html_from_url(url):
+    response = urllib3.request.urlopen(url)
+    content = response.read().decode('UTF-8')
+    return content
