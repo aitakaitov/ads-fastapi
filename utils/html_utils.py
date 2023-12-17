@@ -141,9 +141,6 @@ def process_for_extraction(html):
     id_to_element = {
         i: el for i, el in enumerate(relevant_elements)
     }
-
-    for i, el in id_to_element.items():
-        el[ELEMENT_ID_ATTRIBUTE] = i
     
     id_text_list = [
         {
@@ -161,7 +158,7 @@ def process_for_extraction(html):
     }
 
 
-def find_token_sequence_in_element(element, tokens, element_tokens = [], token_elements = []):
+def get_token_sequence_from_element(element, tokens, element_tokens = [], token_elements = []):
     for child in element.children:
         if isinstance(child, bs4.NavigableString):
             string = str(child)
@@ -178,18 +175,18 @@ def find_token_sequence_in_element(element, tokens, element_tokens = [], token_e
                     element_tokens.append(t)
                     token_elements.append(child)
         elif child.name is not None:
-            find_token_sequence_in_element(child, tokens, element_tokens, token_elements)    
+            get_token_sequence_from_element(child, tokens, element_tokens, token_elements)    
     
     return element_tokens, token_elements
 
 
-def get_range_in_element(element, tokens):
-    element_tokens, token_elements = find_token_sequence_in_element(element, tokens)
+def get_range_in_element(soup, element, tokens, k=2):
+    element_tokens, token_elements = get_token_sequence_from_element(element, tokens)
     tokens_set = set(tokens)
     max_overlap_index = 0
     max_jaccard = 0
     for i in range(0, len(element_tokens) - len(tokens)):
-        temp_set = set(element_tokens[i:len(tokens)])
+        temp_set = set(element_tokens[i:i + len(tokens)])
         jacc = len(temp_set.intersection(tokens_set)) / len(temp_set.union(tokens_set))
         if jacc > max_jaccard:
             max_overlap_index = i
@@ -197,69 +194,148 @@ def get_range_in_element(element, tokens):
             if jacc == 1.0:
                 break
     
-    # TODO
-    # figure out how to identify starting and ending elements
-    # figure out how to calculate offset from start of element
-    # maybe wrap the start and end text elements in spans and give them attributes?
+    start_wrapper = soup.new_tag('span')
+    token_elements[max_overlap_index].insert_before(start_wrapper)
+    start_wrapper.append(token_elements[max_overlap_index])
 
-    starting_element = token_elements[max_overlap_index].parent
-    ending_element = token_elements[max_overlap_index + len(tokens)].parent
+    if token_elements[max_overlap_index] == token_elements[max_overlap_index + len(tokens)]:
+        end_wrapper = start_wrapper
+    else:
+        end_wrapper = soup.new_tag('span')
+        token_elements[max_overlap_index + len(tokens)].insert_before(end_wrapper)
+        end_wrapper.append(token_elements[max_overlap_index + len(tokens)])
 
-    SPAN_LENGTH = 2
+        
+    current_k = k
+    starting_offset = None
+    while True:
+        for i in range(current_k):
+            if i == 0:
+                start_text = tokens[i]
+            elif tokens[i].isalnum():
+                start_text += ' ' + tokens[i]
+            else:
+                start_text += tokens[i]
 
-    start_text = ''
-    for i in range(SPAN_LENGTH):
-        if i == 0:
-            start_text = tokens[i]
-        elif tokens[i].isalnum():
-            start_text += ' ' + tokens[i]
-        else:
-            start_text += tokens[i]
+        try:
+            starting_offset = start_wrapper.get_text().index(start_text)
+            break
+        except Exception:
+            if current_k > 0:
+                current_k -= 1
+                continue
+            else:
+                starting_offset = -1
+                break
+        
+    
+    current_k = k
+    ending_offset = None
+    while True:
+        end_text = ''
+        for i in range(current_k):
+            if i == 0:
+                end_text = tokens[-current_k]
+            elif tokens[-current_k + i].isalnum():
+                end_text += ' ' + tokens[-current_k + i]
+            else:
+                end_text += tokens[-current_k + i]
+        
+        try:
+            ending_offset = end_wrapper.get_text().index(end_text) + len(end_text)
+            break
+        except Exception:
+            if current_k > 0:
+                current_k -= 1
+                continue
+            else:
+                ending_offset = -1
+                break
+        
+        break
 
-    end_text = ''
-    for i in range(SPAN_LENGTH):
-        if i == 0:
-            end_text = tokens[-SPAN_LENGTH]
-        elif tokens[-SPAN_LENGTH + i].isalnum():
-            end_text += ' ' + tokens[-SPAN_LENGTH + i]
-        else:
-            end_text += tokens[-SPAN_LENGTH + i]
-
-    starting_offset = str(token_elements[max_overlap_index]).index(start_text)
-    ending_offset = str(token_elements[max_overlap_index + len(tokens)]).index(end_text, starting_offset + int(sum([len(t) for t in tokens]) * max_jaccard)) + len(end_text)
-
+    if starting_offset == -1:
+        starting_offset = 0
+    if ending_offset == -1:
+        ending_offset = len(end_wrapper.get_text()) - 1
     
     return {
-        'start_element': starting_element,
+        'start_element': start_wrapper,
         'start_offset': starting_offset,
-        'end_element': ending_element,
+        'end_element': end_wrapper,
         'end_offset': ending_offset
     }
 
 
-def download_html_from_url(url):
-    response = urllib3.request.urlopen(url)
-    content = response.read().decode('UTF-8')
-    return content
+def mark_elements(id2element, entities, soup):
+    entity_data = []
+    for entity in entities:
+        data = get_range_in_element(soup, id2element[entity['id']], entity['context_tokens'])
+
+        same_entity = data['start_element'] == data['end_element'] 
+        if same_entity:
+            data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-start'
+        else:
+            data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-start'
+            data['end_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-end'
+
+        entity_data.append({
+            'type': entity['type'],
+            'attribute': ELEMENT_ID_ATTRIBUTE,
+            'attr_start_value': entity['type'] + '-start',
+            'attr_end_value': entity['type'] + '-end' if not same_entity else entity['type'] + '-start',
+            'start_offset': data['start_offset'],
+            'end_offset': data['end_offset']
+        })
+
+    return entity_data    
+
+def analyze_cookies(html):
+    processed = process_for_extraction(html)
+    # TODO pass the element texts to Extractor
+    dummy_extracted_entities = [
+        {
+            'short_text': 'sit',
+            'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
+            'id': 0,
+            'type': 'first'
+        },
+        {
+            'short_text': 'in',
+            'context_tokens': ['imperdiet', 'in', ',', 'aliquam'],
+            'id': 1,
+            'type': 'second'
+        },
+        {
+            'short_text': 'voluptatem',
+            'context_tokens': ['enim', 'ipsam', 'voluptatem', 'quia'],
+            'id': 2,
+            'type': 'third'
+        }
+    ]
+    entity_data = mark_elements(processed['id_element_map'], dummy_extracted_entities, processed['soup'])
+    modified_html = processed['soup'].prettify()
+
+    return modified_html, entity_data
+
 
 if __name__ == '__main__':
     test_html = """
-<html>
-    <body>
-        <p>
-            Lorem ipsum dolor <span>sit</span> amet, consectetuer adipiscing elit. Etiam quis quam. Duis viverra diam non justo. Mauris dictum facilisis augue.
-        </p>
-        <div>asdasd</div>
-        <p>
-            Fusce dui leo, imperdiet in, aliquam sit amet, feugiat eu, orci. Nullam eget nisl.
-        </p>
-        <p>
-            Nullam eget nisl. <i>Nemo enim ipsam</i> voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
-        </p>
-    </body>
-</html>
-"""
-    processed = process_for_extraction(test_html)
-    tokens_to_find = ["Lorem", "ipsum", "dolor", "sit", "amet", ",", "consectetuer"]
-    data = get_range_in_element(processed['id_element_map'][0], tokens_to_find)
-
+    <html>
+        <body>
+            <p>
+                Lorem ipsum dolor <span>sit</span> amet, consectetuer adipiscing elit. Etiam quis quam. Duis viverra diam non justo. Mauris dictum facilisis augue.
+            </p>
+            <div>asdasd</div>
+            <p>
+                Fusce dui leo, imperdiet in, aliquam sit amet, feugiat eu, orci. Nullam eget nisl.
+            </p>
+            <p>
+                Nullam eget nisl. <i>Nemo enim ipsam</i> voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
+            </p>
+        </body>
+    </html>
+    """
+    result = analyze_cookies(test_html)
+    print(result[0])
+    print(result[1])

@@ -1,3 +1,4 @@
+import json
 from sqlalchemy.orm import Session
 
 from utils.document_similarity import document_to_minhash, are_documents_same
@@ -12,11 +13,12 @@ from . import crud
 from advertisement_processing import classification
 from advertisement_processing import attribution
 
-from utils.pickle_utils import from_binary_string
 from fastapi import FastAPI, Depends, HTTPException
 import transformers
 import torch
 import nltk
+
+from utils.html_utils import analyze_cookies
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -47,7 +49,7 @@ async def root():
 # ----------------------------------------- COOKIES -----------------------------------------
 
 @app.post("/cookies/analyze", response_model=CookiesAnalysis)
-async def analyze(url: Url, db: Session = Depends(get_db)):
+async def analyze(page: Page, db: Session = Depends(get_db)):
     """
     Given a URL, downloads and analyzes the page. 
     
@@ -55,8 +57,45 @@ async def analyze(url: Url, db: Session = Depends(get_db)):
     
     Returns a list of entities with their associated short texts, and HTML to render (incl. a sidebar and JS code)
     """
-    # TODO
-    ...
+    # check if the URL is cached
+    analysis = crud.get_analysis(db, page.url)
+    if analysis:
+        # if yes, check if the page changed
+        minhash = document_to_minhash(page.text)
+        if not are_documents_same(minhash, analysis.minhash, threshold=0.99):
+            # if it did, invalidate cache
+            crud.delete_analysis(db, analysis)
+            analysis = None
+        else:
+            # TODO if it did not, return the rendered HTML with sidebar
+            return CookiesAnalysis(
+                url=page.url, 
+                entities=[
+                    EntityInfo(short_Text=e['short_text'], entity=e['type']) for e in json.loads(analysis.entity_data_json)
+                ], 
+                page_to_render=analysis.processed_html
+            )
+    
+    # the URL is not cached
+    minhash = document_to_minhash(page.text)
+
+    # get the processed page
+    modified_html, entity_data = analyze_cookies(page.text)
+
+    # TODO create rendered HTML with sidebar
+    modified_html = modified_html
+
+    # cache original minhash, modified HTML, URL, short texts of entities, IDs and offsets of context elements
+    crud.create_analysis(db, page.url, modified_html, entity_data, minhash)
+
+    # return rendered HTML with sidebar
+    return CookiesAnalysis(
+        url=page.url, 
+        entities=[
+            EntityInfo(short_Text=e['short_text'], entity=e['type']) for e in entity_data
+        ], 
+        page_to_render=modified_html
+    )
 
 
 @app.post("/cookies/select", response_model=CookiesAnalysis)
@@ -66,7 +105,13 @@ async def analyze(request: SelectEntityRequest, db: Session = Depends(get_db)):
 
     If the page is not cached (it should be), returns 400
     """
-    # TODO
+    # check if the page is cached
+
+        # if not, return 400
+    
+    # modify the cached HTML with sidebar based on the entity selected
+
+    # return the modified HTML
     ...    
 
 # ----------------------------------------- ADS CLASSIFICATION, RATIONALES -----------------------------------------

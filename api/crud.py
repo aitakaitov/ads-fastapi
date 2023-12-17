@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from typing import List
-from utils.pickle_utils import to_binary_string
+import json
 
 
 def get_page(db: Session, url: str) -> models.PageInfo | None:
@@ -57,3 +57,23 @@ def update_domain_cache(db: Session, domain: str, cookie_url: str) -> bool:
 
 def get_cookie_url_from_cache(db: Session, domain: str) -> models.DomainUrl | None:
     return db.query(models.DomainUrl).filter(models.DomainUrl.domain == domain).first()
+
+
+def get_analysis(db: Session, url: str) -> models.CookiesAnalysis | None:
+    return db.query(models.CookiesAnalysis).filter(models.CookiesAnalysis.url == url).first()
+
+
+def delete_analysis(db: Session, analysis: models.CookiesAnalysis):
+    db.delete(analysis)
+    db.commit()
+
+
+def create_analysis(db: Session, url: str, modified_html: str, entity_data: dict, minhash):
+    analysis = models.CookiesAnalysis(
+        url=url,
+        processed_html=modified_html,
+        minhash=minhash,
+        entity_data_json=json.dumps(entity_data)
+    )
+    db.add(analysis)
+    db.commit()
