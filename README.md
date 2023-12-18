@@ -1,5 +1,7 @@
 # FastAPI backend for advertisement detection
 
+Download the ad detection model from https://drive.google.com/file/d/1qK2xAY4etLJ8pL6fphSwG77fdDo3VYbL/view?usp=sharing and put it in the root directory of the project
+
 ## Build and run
 
 <code>docker compose up</code>
