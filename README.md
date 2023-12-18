@@ -2,25 +2,40 @@
 
 ## Build and run
 
-<code>docker build -t fastapi-backend .</code>
-
-<code>docker run --name fastapi-server -p 8001:8001 fastapi-backend</code>
+<code>docker compose up</code>
 
 The server inside the container runs on <code>0.0.0.0:8001</code>.
 
-## Endpoints
+See SwaggerDoc at <code>http://localhost:8001/docs#</code>
 
-<code>GET /</code> : returns Hello World
+## API for entity extraction
+* `utils.html_utils.analyze_cookies(html: str)` takes HTML code as input.
+* it then calls `process_for_extraction(html: str)`, which returns
+```python
+[
+    {
+        # element id
+        'id': int,
+        # element text
+        'text': str,
+        # element tag - "p", "h1-6"
+        'tag': str
+    }
+]
+```
+* it passes this array to the extractor and expects a list of entity info
+```python
+[
+    {
+        # extracted entity
+        'short_text': str,
+        # entity context
+        'context_tokens': list[str],
+        # element id
+        'id': 0,
+        # what entity
+        'type': 'first'
+    }
+]
+```
 
-<code>POST /classify</code> : classifies a webpage
-
-<code>POST /rationale</code> : returns rationales if a page is already classified
-
-<code>POST /domains/{domain}</code> : add cookies URL for a domain
-
-<code>GET /domains/{domain}</code> : get cookies URL of a domain
-
-<code>PUT /domains/{domain}</code> : set new cookies url for a domain
-
-
-See SwaggerDoc at <code>address:port/docs#</code>

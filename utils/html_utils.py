@@ -292,7 +292,9 @@ def mark_elements(id2element, entities, soup):
 
 def analyze_cookies(html):
     processed = process_for_extraction(html)
+
     # TODO pass the element texts to Extractor
+    
     dummy_extracted_entities = [
         {
             'short_text': 'sit',
@@ -337,5 +339,4 @@ if __name__ == '__main__':
     </html>
     """
     result = analyze_cookies(test_html)
-    print(result[0])
-    print(result[1])
+    print(result)
