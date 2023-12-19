@@ -134,15 +134,15 @@ def _clean_text(text):
 
 
 allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']
-def process_for_extraction(html):
+def process_for_extraction(html: str) -> dict[str, object]:
     soup = bs4.BeautifulSoup(html)
     relevant_elements = soup.find_all(allowed_tags)
 
-    id_to_element = {
+    id_to_element: dict[int, bs4.Tag] = {
         i: el for i, el in enumerate(relevant_elements)
     }
     
-    id_text_list = [
+    id_text_list: list[dict[str, object]] = [
         {
             'id': i,
             'text': _clean_text(el.get_text()),

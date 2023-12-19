@@ -302,8 +302,8 @@ def extract_lhuta(text_processor: TextProcessor):
     return sentences
 
 
-def extract_from_agreements(text: str, text_processor: TextProcessor):
-    text_processor.process(text)
+def extract_from_agreements(texts: list[dict[str, object]], text_processor: TextProcessor):
+    text_processor.process(texts)
     
     company, address = extract_spravce(text_processor)
     third_companies = extract_predavani(text_processor)
@@ -340,7 +340,9 @@ def main(args):
 
         processed = process_for_extraction(html)
 
-        print(processed)
+        textProcessor = TextProcessor(filename)
+
+        out_dict = extract_from_agreements(processed["texts"], textProcessor)
 
         continue
 

@@ -13,6 +13,8 @@ HEADING_SEPARATORS = ["HHHHHS", "HHHHHE"]
 PARAGRAPH_SEPARATORS = ["PPPPPS", "PPPPPE"]
 SPECIAL_TOKENS = HEADING_SEPARATORS + PARAGRAPH_SEPARATORS
 
+H_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+
 @dataclass
 class NamedEntity:
     type: str
@@ -64,12 +66,13 @@ class TextProcessor:
         return response.text
 
     @staticmethod
-    def _add_text_index(parsed_conllu):
+    def _add_text_index(parsed_tags):
         text_index = 0
-        for sentence in parsed_conllu:    
-            for token in sentence:
-                token['text_index'] = text_index
-                text_index += 1
+        for tag in parsed_tags:
+            for sentence in tag["parsed_text"]:    
+                for token in sentence:
+                    token['text_index'] = text_index
+                    text_index += 1
 
     @staticmethod
     def _conlu_to_text(flattened_tokens):
@@ -145,26 +148,31 @@ class TextProcessor:
     #                     print(ner, tok['form'])      
     #     return times 
 
-
-    def process(self, text:str):
+    def _recognize_entities(self, text: str):
         json_output = TextProcessor.process_text(tokenizer=None, tagger="data", parser=None, output="conllu", data=text)
-
         parsed_output = json.loads(json_output)
-
         json_output = TextProcessor.recognize_entities(parsed_output['result'])
         parsed_output = json.loads(json_output)
-
         parsed_conllu = conllu.parse(parsed_output['result'])
+        return parsed_conllu
         
-        self._add_text_index(parsed_conllu)
 
-        self.hierarchical_tokens = parsed_conllu
-        flatened =  [(token,sent_id) for sent_id,sentence in enumerate(parsed_conllu) for token in sentence]
+    def process(self, texts:list[dict[str, object]]):
+        parsed_tags = [{"id": text['id'], "text": text['text'], "parsed_text": self._recognize_entities(text['text']), "tag": text['tag']} for text in texts]
+
+        self._add_text_index(parsed_tags)
+
+        self.hierarchical_tokens = parsed_tags
+
+        flatened =  [(token,sent_id) for tag in parsed_tags for sent_id,sentence in enumerate(tag["parsed_text"]) for token in sentence]
+        assert all([i == token[0]["text_index"] for i, token in enumerate(flatened)])
+
         self.flattened_tokens = [tok for tok,sent_id in flatened]
         self.sent_ids_for_tokens = [sent_id for tok,sent_id in flatened]
-        self.heading_ranges = [0] + [i for i, token in enumerate(self.flattened_tokens) if token['form'] == HEADING_SEPARATORS[0]] + [len(self.flattened_tokens)-1]
+        self.heading_ranges = [tag['parsed_text'][0][0]['text_index'] for tag in self.hierarchical_tokens if tag['tag'] in H_TAGS] + [len(self.flattened_tokens)-1]
 
-
+        if self.heading_ranges[0] != 0:
+            self.heading_ranges = [0] + self.heading_ranges
 
         self._extract_named_entities()
 

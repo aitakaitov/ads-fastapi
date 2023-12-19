@@ -22,13 +22,12 @@
             "name": "extract entities",
             "type": "python",
             "request": "launch",
-            "program": "advertisement_processing/regular_extractor/main.py",
+            "program": "tacr-fastapi/advertisement_processing/regular_extractor/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            // "args": ["--datadir", "RegularExtractor/data", "--lemmatize"]
             "args": [
                 "--datadir",
-                "advertisement_processing/regular_extractor/data"
+                "tacr-fastapi/advertisement_processing/regular_extractor/data"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}${pathSeparator}tacr-fastapi${pathSeparator}${env:PYTHONPATH}"
@@ -38,15 +37,14 @@
             "name": "lematize examples",
             "type": "python",
             "request": "launch",
-            "program": "advertisement_processing/regular_extractor/main.py",
+            "program": "tacr-fastapi/advertisement_processing/regular_extractor/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
                 "--datadir",
-                "advertisement_processing/regular_extractor/data",
+                "tacr-fastapi/advertisement_processing/regular_extractor/data",
                 "--lemmatize"
             ]
-            // "args": ["--datadir", "RegularExtractor/data"]
         }
     ]
 }
