@@ -1,0 +1,52 @@
+spravce, kontakt_spravce_email, kontakt_spravce_tel
+
+TODO: blacklist some entities (EU)
+
+1. locate lemma text "správce osobní údaj"
+2. define text are -20 words, +100 words
+3. find the nearest company to the text in 1)
+4. find the nearest address to the text to 3)
+5. find the nearest phone to the text to 3)
+6. find the nearest e-mail to the text to 3)
+
+prijemce
+
+1. locate text "předávát * osobní údaj" nebo "příjemce * osobní údaj"
+2. define text are -20 words, +100 words
+3. extract all companies
+
+druh_udaju
+
+1. locate text "Zpracovávaný údaj rozsah jméno příjmení"
+2. Extract the first 2 sentences.
+
+doba_zpracovani
+
+1. locate text "dlouhý váš osobní údaj zpracovávat"
+2. define text are -20 words, +100 words
+3. extract all time values, return the first
+
+pristup_zadost
+
+1. locate text 75% "Přístup portabilita požádat žádat osobní údaj"
+2. Extract the first 2 sentences.
+
+
+
+vymaz_zadost
+
+1. locate text 75% "výmaz vymazat požádat žádat osobní údaj"
+2. Extract the first 2 sentences.
+
+lhuta_zadost
+
+1. extract time entity in pristup_zadost or vymaz_zadost
+
+
+
+Příklad MAFRA:
+
+Pokud obdržíme takovou žádost, budeme informovat žadatele o přijatých opatřeních bez zbytečného odkladu a v každém případě do jednoho měsíce od obdržení žádosti. Tuto lhůtu je možné v případě potřeby a s ohledem na složitost a počet žádostí prodloužit o další dva měsíce. Naše společnost  není v určitých případech stanovených Nařízením povinno zcela nebo zčásti žádosti vyhovět. Bude tomu tak zejména, bude-li žádost zjevně nedůvodná nebo nepřiměřená, zejména protože se opakuje. V takových případech můžeme:
+
+uložit přiměřený poplatek zohledňující administrativní náklady spojené s poskytnutím požadovaných informací nebo sdělení nebo s učiněním požadovaných úkonů nebo
+odmítnout žádosti vyhovět

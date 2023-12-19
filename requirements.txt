@@ -12,3 +12,5 @@ kshingle~=0.10.0
 datasketch~=1.6.4
 xxhash~=3.4.1
 spacy
+perscache
+conllu

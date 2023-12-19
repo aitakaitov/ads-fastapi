@@ -1,2 +1,6 @@
 ﻿.idea
 __pycache__
+.cache/
+.DS_Store
+data-w/
+lemmatized/
