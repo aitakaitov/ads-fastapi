@@ -14,3 +14,4 @@ xxhash~=3.4.1
 spacy
 perscache
 conllu
+bleach
