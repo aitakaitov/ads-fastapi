@@ -146,7 +146,7 @@ def process_for_extraction(html):
         {
             'id': i,
             'text': _clean_text(el.get_text()),
-            'tag': el.tag
+            'tag': el.name
         }
         for i, el in id_to_element.items()
     ]
@@ -292,7 +292,9 @@ def mark_elements(id2element, entities, soup):
 
 def analyze_cookies(html):
     processed = process_for_extraction(html)
+
     # TODO pass the element texts to Extractor
+    
     dummy_extracted_entities = [
         {
             'short_text': 'sit',
@@ -336,6 +338,7 @@ if __name__ == '__main__':
         </body>
     </html>
     """
+    with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
+        test_html = f.read()
     result = analyze_cookies(test_html)
-    print(result[0])
-    print(result[1])
+    print(result)
