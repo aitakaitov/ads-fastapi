@@ -3,7 +3,7 @@ class Config:
     TRIM_LENGTH = 15
 
     # classification model
-    MODEL_FILE = 'small-e-czech-ads'
+    MODEL_FILE = '../small-e-czech-ads'
 
     # number of interpolation steps for integrated gradients
     IG_SAMPLES = 25

@@ -338,5 +338,7 @@ if __name__ == '__main__':
         </body>
     </html>
     """
+    with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
+        test_html = f.read()
     result = analyze_cookies(test_html)
     print(result)
