@@ -158,7 +158,7 @@ def process_for_extraction(html: str) -> dict[str, object]:
     }
 
 
-def get_token_sequence_from_element(element, tokens, element_tokens = [], token_elements = []):
+def get_token_sequence_from_element(element, element_tokens = [], token_elements = []):
     for child in element.children:
         if isinstance(child, bs4.NavigableString):
             string = str(child)
@@ -175,13 +175,19 @@ def get_token_sequence_from_element(element, tokens, element_tokens = [], token_
                     element_tokens.append(t)
                     token_elements.append(child)
         elif child.name is not None:
-            get_token_sequence_from_element(child, tokens, element_tokens, token_elements)    
+            get_token_sequence_from_element(child, element_tokens, token_elements)    
     
     return element_tokens, token_elements
 
 
-def get_range_in_element(soup, element, tokens, k=2):
-    element_tokens, token_elements = get_token_sequence_from_element(element, tokens)
+def get_range_in_elements(soup, elements, tokens, k=4):
+    element_tokens = []
+    token_elements = []
+    for element in elements:
+        t, e = get_token_sequence_from_element(element)
+        element_tokens.extend(t)
+        token_elements.extend(e)
+
     tokens_set = set(tokens)
     max_overlap_index = 0
     max_jaccard = 0
@@ -221,7 +227,7 @@ def get_range_in_element(soup, element, tokens, k=2):
             starting_offset = start_wrapper.get_text().index(start_text)
             break
         except Exception:
-            if current_k > 0:
+            if current_k > 1:
                 current_k -= 1
                 continue
             else:
@@ -245,15 +251,13 @@ def get_range_in_element(soup, element, tokens, k=2):
             ending_offset = end_wrapper.get_text().index(end_text) + len(end_text)
             break
         except Exception:
-            if current_k > 0:
+            if current_k > 1:
                 current_k -= 1
                 continue
             else:
                 ending_offset = -1
                 break
         
-        break
-
     if starting_offset == -1:
         starting_offset = 0
     if ending_offset == -1:
@@ -270,23 +274,30 @@ def get_range_in_element(soup, element, tokens, k=2):
 def mark_elements(id2element, entities, soup):
     entity_data = []
     for entity in entities:
-        data = get_range_in_element(soup, id2element[entity['id']], entity['context_tokens'])
-
-        same_entity = data['start_element'] == data['end_element'] 
-        if same_entity:
-            data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-start'
-        else:
-            data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-start'
-            data['end_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + '-end'
-
-        entity_data.append({
+        e_data = {
             'type': entity['type'],
-            'attribute': ELEMENT_ID_ATTRIBUTE,
-            'attr_start_value': entity['type'] + '-start',
-            'attr_end_value': entity['type'] + '-end' if not same_entity else entity['type'] + '-start',
-            'start_offset': data['start_offset'],
-            'end_offset': data['end_offset']
-        })
+            'short_text': entity['short_text']
+        }
+        appearances = []
+        for idx, appearance in enumerate(entity['appearances']):
+            data = get_range_in_elements(soup, [id2element[id] for id in appearance['ids']], appearance['context_tokens'])
+
+            same_entity = data['start_element'] == data['end_element'] 
+            if same_entity:
+                data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-start-{idx}'
+            else:
+                data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-start-{idx}'
+                data['end_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-end-{idx}'
+
+            appearances.append({
+                'attribute': ELEMENT_ID_ATTRIBUTE,
+                'attr_start_value': entity['type'] + f'-start-{idx}',
+                'attr_end_value': entity['type'] + f'-end-{idx}' if not same_entity else entity['type'] + f'-start-{idx}',
+                'start_offset': data['start_offset'],
+                'end_offset': data['end_offset']
+            })
+        e_data['appearances'] = appearances
+        entity_data.append(e_data)
 
     return entity_data    
 
@@ -298,23 +309,20 @@ def analyze_cookies(html):
     dummy_extracted_entities = [
         {
             'short_text': 'sit',
-            'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
-            'id': 0,
-            'type': 'first'
-        },
-        {
-            'short_text': 'in',
-            'context_tokens': ['imperdiet', 'in', ',', 'aliquam'],
-            'id': 1,
-            'type': 'second'
-        },
-        {
-            'short_text': 'voluptatem',
-            'context_tokens': ['enim', 'ipsam', 'voluptatem', 'quia'],
-            'id': 2,
-            'type': 'third'
+            'type': 'entity one',
+            'appearances': [
+                {
+                    'ids': [0, 1],
+                    'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
+                },
+                {
+                    'ids': [1, 2],
+                    'context_tokens': ['Nullam', 'eget', 'nisl', '.', 'Nullam', 'eget', 'nisl', '.'],
+                }
+            ],
         }
     ]
+
     entity_data = mark_elements(processed['id_element_map'], dummy_extracted_entities, processed['soup'])
     modified_html = processed['soup'].prettify()
 
@@ -338,7 +346,8 @@ if __name__ == '__main__':
         </body>
     </html>
     """
-    with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
-        test_html = f.read()
+    #with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
+    #    test_html = f.read()
     result = analyze_cookies(test_html)
-    print(result)
+    print(result[0])
+    print(result[1])
