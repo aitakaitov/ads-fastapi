@@ -146,7 +146,7 @@ def process_for_extraction(html):
         {
             'id': i,
             'text': _clean_text(el.get_text()),
-            'tag': el.tag
+            'tag': el.name
         }
         for i, el in id_to_element.items()
     ]
