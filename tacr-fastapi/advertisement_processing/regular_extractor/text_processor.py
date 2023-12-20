@@ -174,15 +174,15 @@ class TextProcessor:
         self.sent_ids_for_tokens = []
         self.tag_ids_for_tokens = []
         for tag in parsed_tags:
-            tag_index += 1
             for sentence in tag["parsed_text"]:
-                sentence_index += 1
                 self.flattened_sentences.append(sentence)
                 for token in sentence:
-                    token_index += 1
                     self.flattened_tokens.append(token)
                     self.sent_ids_for_tokens.append(sentence_index)
                     self.tag_ids_for_tokens.append(tag_index)
+                    token_index += 1
+                sentence_index += 1
+            tag_index += 1
 
 
         assert all([i == token["text_index"] for i, token in enumerate(self.flattened_tokens)])
