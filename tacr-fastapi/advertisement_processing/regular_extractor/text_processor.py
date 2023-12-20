@@ -164,11 +164,29 @@ class TextProcessor:
 
         self.hierarchical_tokens = parsed_tags
 
-        flatened =  [(token,sent_id) for tag in parsed_tags for sent_id,sentence in enumerate(tag["parsed_text"]) for token in sentence]
-        assert all([i == token[0]["text_index"] for i, token in enumerate(flatened)])
+        # flatened =  [token for tag in parsed_tags for sentence in tag["parsed_text"] for token in sentence]
 
-        self.flattened_tokens = [tok for tok,sent_id in flatened]
-        self.sent_ids_for_tokens = [sent_id for tok,sent_id in flatened]
+        token_index = 0
+        sentence_index = 0
+        tag_index = 0
+        self.flattened_tokens = []
+        self.flattened_sentences = []
+        self.sent_ids_for_tokens = []
+        self.tag_ids_for_tokens = []
+        for tag in parsed_tags:
+            tag_index += 1
+            for sentence in tag["parsed_text"]:
+                sentence_index += 1
+                self.flattened_sentences.append(sentence)
+                for token in sentence:
+                    token_index += 1
+                    self.flattened_tokens.append(token)
+                    self.sent_ids_for_tokens.append(sentence_index)
+                    self.tag_ids_for_tokens.append(tag_index)
+
+
+        assert all([i == token["text_index"] for i, token in enumerate(self.flattened_tokens)])
+
         self.heading_ranges = [tag['parsed_text'][0][0]['text_index'] for tag in self.hierarchical_tokens if tag['tag'] in H_TAGS] + [len(self.flattened_tokens)-1]
 
         if self.heading_ranges[0] != 0:
@@ -268,8 +286,8 @@ class TextProcessor:
         return True, end_index
     
     def start_end_from_sentence(self, sent_id):
-        start = self.flattened_tokens.index(self.hierarchical_tokens[sent_id][0])
-        end = self.flattened_tokens.index(self.hierarchical_tokens[sent_id][-1])
+        start = self.flattened_tokens.index(self.flattened_sentences[sent_id][0])
+        end = self.flattened_tokens.index(self.flattened_sentences[sent_id][-1])
         return start,end
 
 
@@ -316,7 +334,7 @@ class TextProcessor:
             sent_ids.add(self.sent_ids_for_tokens[token_index])
 
         sentences = []
-        sentences_token_lits = [(sent_id, [w for w in self.hierarchical_tokens[sent_id]]) for sent_id in sent_ids]
+        sentences_token_lits = [(sent_id, [w for w in self.flattened_sentences[sent_id]]) for sent_id in sent_ids]
 
         
         sentences = [{"text":self._conlu_to_text(sent), "range":self.start_end_from_sentence(sent_id)} for sent_id,sent in sentences_token_lits] 
