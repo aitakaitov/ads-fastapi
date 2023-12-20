@@ -344,11 +344,6 @@ def main(args):
 
         out_dict = extract_from_agreements(processed["texts"], textProcessor)
 
-        continue
-
-        textProcessor = TextProcessor(filename)
-
-        out_dict = extract_from_agreements(text, textProcessor)
 
         for key,value in out_dict.items():
             found_entities[key].append(value)

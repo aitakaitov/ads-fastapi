@@ -187,7 +187,7 @@ class TextProcessor:
 
         assert all([i == token["text_index"] for i, token in enumerate(self.flattened_tokens)])
 
-        self.heading_ranges = [tag['parsed_text'][0][0]['text_index'] for tag in self.hierarchical_tokens if tag['tag'] in H_TAGS] + [len(self.flattened_tokens)-1]
+        self.heading_ranges = [tag['parsed_text'][0][0]['text_index'] for tag in self.hierarchical_tokens if (len(tag['parsed_text']) > 0) and (tag['tag'] in H_TAGS)] + [len(self.flattened_tokens)-1]
 
         if self.heading_ranges[0] != 0:
             self.heading_ranges = [0] + self.heading_ranges
