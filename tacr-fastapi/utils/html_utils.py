@@ -157,7 +157,7 @@ def get_text_recursive(element, texts = []):
     return texts
 
 def process_for_extraction(html: str) -> dict[str, object]:
-    soup = bs4.BeautifulSoup(html)
+    soup = bs4.BeautifulSoup(html, 'html.parser')
     relevant_elements = soup.find_all(allowed_tags)
 
     modified_elements = [clone_and_clean_element(el) for el in relevant_elements]
@@ -386,6 +386,10 @@ if __name__ == '__main__':
     """
     #with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
     #    test_html = f.read()
+    #from bs4.diagnose import diagnose
+    #diagnose(test_html)
+    #exit() 
+
     result = analyze_cookies(test_html)
     print(result[0])
     print(result[1])
