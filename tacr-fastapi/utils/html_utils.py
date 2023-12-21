@@ -91,54 +91,58 @@ def html_to_plaintext(html, keep_paragraphs_only=False, trim_start=None, lowerca
     return soup_text
 
 
-def xpath_soup(element):
-    # type: (typing.Union[bs4.element.Tag, bs4.element.NavigableString]) -> str
-    """
-    Generate xpath from BeautifulSoup4 element.
-    :param element: BeautifulSoup4 element.
-    :type element: bs4.element.Tag or bs4.element.NavigableString
-    :return: xpath as string
-    :rtype: str
-    Usage
-    -----
-    >>> import bs4
-    >>> html = (
-    ...     '<html><head><title>title</title></head>'
-    ...     '<body><p>p <i>1</i></p><p>p <i>2</i></p></body></html>'
-    ...     )
-    >>> soup = bs4.BeautifulSoup(html, 'html.parser')
-    >>> xpath_soup(soup.html.body.p.i)
-    '/html/body/p[1]/i'
-    >>> import bs4
-    >>> xml = '<doc><elm/><elm/></doc>'
-    >>> soup = bs4.BeautifulSoup(xml, 'lxml-xml')
-    >>> xpath_soup(soup.doc.elm.next_sibling)
-    '/doc/elm[2]'
-    """
-    components = []
-    child = element if element.name else element.parent
-    for parent in child.parents:  # type: bs4.element.Tag
-        siblings = parent.find_all(child.name, recursive=False)
-        components.append(
-            child.name if 1 == len(siblings) else '%s[%d]' % (
-                child.name,
-                next(i for i, s in enumerate(siblings, 1) if s is child)
-                )
-            )
-        child = parent
-    components.reverse()
-    return '/%s' % '/'.join(components)
+# def xpath_soup(element):
+#     # type: (typing.Union[bs4.element.Tag, bs4.element.NavigableString]) -> str
+#     """
+#     Generate xpath from BeautifulSoup4 element.
+#     :param element: BeautifulSoup4 element.
+#     :type element: bs4.element.Tag or bs4.element.NavigableString
+#     :return: xpath as string
+#     :rtype: str
+#     Usage
+#     -----
+#     >>> import bs4
+#     >>> html = (
+#     ...     '<html><head><title>title</title></head>'
+#     ...     '<body><p>p <i>1</i></p><p>p <i>2</i></p></body></html>'
+#     ...     )
+#     >>> soup = bs4.BeautifulSoup(html, 'html.parser')
+#     >>> xpath_soup(soup.html.body.p.i)
+#     '/html/body/p[1]/i'
+#     >>> import bs4
+#     >>> xml = '<doc><elm/><elm/></doc>'
+#     >>> soup = bs4.BeautifulSoup(xml, 'lxml-xml')
+#     >>> xpath_soup(soup.doc.elm.next_sibling)
+#     '/doc/elm[2]'
+#     """
+#     components = []
+#     child = element if element.name else element.parent
+#     for parent in child.parents:  # type: bs4.element.Tag
+#         siblings = parent.find_all(child.name, recursive=False)
+#         components.append(
+#             child.name if 1 == len(siblings) else '%s[%d]' % (
+#                 child.name,
+#                 next(i for i, s in enumerate(siblings, 1) if s is child)
+#                 )
+#             )
+#         child = parent
+#     components.reverse()
+#     return '/%s' % '/'.join(components)
 
 
 def _clean_text(text):
     return re.sub('\\s+', ' ', text)
 
+# list of tags we extract text from
+ALLOWED_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']
 
-allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']
-
-def clone_and_clean_element(element):
+def clone_and_clean_element(element: bs4.Tag) -> bs4.Tag:
+    """
+    Makes a deepcopy of an element, then removes any element with name in ALLOWED_TAGS from it. 
+    Returns the modified element. Does not modify the passed element.
+    """
     element_copy = copy.deepcopy(element)
-    tags_to_remove = element_copy.find_all(allowed_tags)
+    tags_to_remove = element_copy.find_all(ALLOWED_TAGS)
     for tag in tags_to_remove:
         try:
             tag.decompose()
@@ -146,23 +150,34 @@ def clone_and_clean_element(element):
             pass
     return element_copy
 
-def get_text_recursive(element, texts = []):
-    for child in element.children:
-        if isinstance(child, bs4.NavigableString):
-            string = str(child)
-            texts.append(string)
-        elif child.name is not None:
-            get_token_sequence_from_element(child, texts)    
+# def get_text_recursive(element, texts = []):
+#     for child in element.children:
+#         if isinstance(child, bs4.NavigableString):
+#             string = str(child)
+#             texts.append(string)
+#         elif child.name is not None:
+#             get_token_sequence_from_element(child, texts)    
     
-    return texts
+#     return texts
 
 def process_for_extraction(html: str) -> dict[str, object]:
+    """
+    Parses the HTML.
+
+    Finds all elements with name in ALLOWED_TAGS, removes multiplicity (e.g. an <ul> element containing another <ul> element will return the entire text only once,
+    but possibly split across multiple parts).
+
+    Creates element-ID mapping and ID-text mapping. The text is extracted from cleaned elements. 
+    """
+    
+    # 'html.parser' is required as it keeps most of the HTML structure without modifying elements
     soup = bs4.BeautifulSoup(html, 'html.parser')
-    relevant_elements = soup.find_all(allowed_tags)
+    relevant_elements = soup.find_all(ALLOWED_TAGS)
 
+    # remove occurences of ALLOWED_TAGS elements in each element - to prevent multiplicity 
     modified_elements = [clone_and_clean_element(el) for el in relevant_elements]
-    #modified_elements = relevant_elements
-
+    
+    # create ID - element mappings
     id_to_modified_element: dict[int, bs4.Tag] = {
         i: el for i, el in enumerate(modified_elements)
     } 
@@ -171,6 +186,7 @@ def process_for_extraction(html: str) -> dict[str, object]:
         i: el for i, el in enumerate(relevant_elements)
     }
     
+    # construct objects to pass to Extractor
     id_text_list: list[dict[str, object]] = [
         {
             'id': i,
@@ -210,14 +226,29 @@ def get_token_sequence_from_element(element, element_tokens = [], token_elements
     return element_tokens, token_elements
 
 
-def get_range_in_elements(soup, elements, tokens, k=4):
+def get_range_in_elements(soup, elements, tokens, k=4) -> dict[str, bs4.Tag | int]:
+    """
+    Finds the start and end of a sequence of tokens in a list of elements.
+
+    Finding the starting and ending offsets is based on k first/last tokens.
+
+    Wraps the starting and ending bs4.NavigableString elements in spans and returns the wrappers.
+
+    The offsets are in characters.
+    """
+    
+    # tokenized element texts
     element_tokens = []
+    # a corresponding element for each token (element_tokens[i] is from element token_elements[i])
     token_elements = []
+
+    # for each element, extract tokenized text and concatenate them
     for element in elements:
         t, e = get_token_sequence_from_element(element)
         element_tokens.extend(t)
         token_elements.extend(e)
 
+    # find the best match by sliding the target tokens over the extracted element tokens
     tokens_set = set(tokens)
     max_overlap_index = 0
     max_jaccard = 0
@@ -228,20 +259,24 @@ def get_range_in_elements(soup, elements, tokens, k=4):
             max_overlap_index = i
             max_jaccard = jacc
             if jacc == 1.0:
+                # exit on exact match
                 break
     
+    # wrap the starting bs4.NavigableString element in a span
     start_wrapper = soup.new_tag('span')
     token_elements[max_overlap_index].insert_before(start_wrapper)
     start_wrapper.append(token_elements[max_overlap_index])
 
+    # if the start and end are in the same elements, do nothing
     if token_elements[max_overlap_index] == token_elements[max_overlap_index + len(tokens)]:
         end_wrapper = start_wrapper
     else:
+        # otherwise wrap the ending element
         end_wrapper = soup.new_tag('span')
         token_elements[max_overlap_index + len(tokens)].insert_before(end_wrapper)
         end_wrapper.append(token_elements[max_overlap_index + len(tokens)])
 
-        
+    # find the starting offset in the starting element
     current_k = k
     starting_offset = None
     while True:
@@ -257,6 +292,7 @@ def get_range_in_elements(soup, elements, tokens, k=4):
             starting_offset = start_wrapper.get_text().index(start_text)
             break
         except Exception:
+            # if K is too high, lower it
             if current_k > 1:
                 current_k -= 1
                 continue
@@ -264,7 +300,7 @@ def get_range_in_elements(soup, elements, tokens, k=4):
                 starting_offset = -1
                 break
         
-    
+    # do the same for the ending element
     current_k = k
     ending_offset = None
     while True:
@@ -287,7 +323,8 @@ def get_range_in_elements(soup, elements, tokens, k=4):
             else:
                 ending_offset = -1
                 break
-        
+    
+    # if we did not find the starting or ending offsets, set them to the start/end of the respective element
     if starting_offset == -1:
         starting_offset = 0
     if ending_offset == -1:
@@ -301,21 +338,36 @@ def get_range_in_elements(soup, elements, tokens, k=4):
     }
 
 
-def mark_elements(id2element, entities, soup):
+def mark_elements(id2element, entities, soup) -> list[dict[str, object]]:
+    """
+    Given ID-element mapping and a list of extracted entities, finds the start and end of each appearance of each entity.
+
+    Appearance is identified by a starting element and offset + ending element and offset
+
+    Soup is passed by reference and modified
+    """
+
     entity_data = []
     for entity in entities:
+        # create entity dict
         e_data = {
             'type': entity['type'],
             'short_text': entity['short_text']
         }
+        # find all appearances
         appearances = []
         for idx, appearance in enumerate(entity['appearances']):
+            # find the start and end elements + offsets based on context tokens of the appearance
             data = get_range_in_elements(soup, [id2element[id] for id in appearance['ids']], appearance['context_tokens'])
 
+            # modify the HTML by adding an attribute to the starting and ending elements
+            # note that 'data' contains reference to the starting and ending element
             same_entity = data['start_element'] == data['end_element'] 
             if same_entity:
+                # if it starts and ends with the same entity, we need only one element
                 data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-start-{idx}'
             else:
+                # otherwise, we need to mark start and end 
                 data['start_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-start-{idx}'
                 data['end_element'][ELEMENT_ID_ATTRIBUTE] = entity['type'] + f'-end-{idx}'
 
@@ -332,6 +384,7 @@ def mark_elements(id2element, entities, soup):
     return entity_data    
 
 def analyze_cookies(html):
+    # get elements and texts to pass to the extractor
     processed = process_for_extraction(html)
 
     # TODO pass the element texts to Extractor
@@ -353,6 +406,7 @@ def analyze_cookies(html):
         }
     ]
 
+    # modify the HTML to allow for text highlighting
     entity_data = mark_elements(processed['id_element_map'], dummy_extracted_entities, processed['soup'])
     modified_html = processed['soup'].prettify()
 
