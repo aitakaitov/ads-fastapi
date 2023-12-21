@@ -298,7 +298,7 @@ class TextProcessor:
     def extract_time(self,sentences):
         times = []
         for sent in sentences:
-            print(sent)
+            # print(sent)
             s,e = sent["range"]
             
             regs =[["doba", "*1","léta"]]
@@ -314,13 +314,13 @@ class TextProcessor:
                     continue
             
             if len(found[0]) == 0:
-                print(self._conlu_to_text(self.flattened_tokens[s:e]))
+                # print(self._conlu_to_text(self.flattened_tokens[s:e]))
                 regs2 =[["doba"]]
                 starts,_ =  self.find_all_reg(regs2,s,e)
                 st = starts[0]
                 text = self._conlu_to_text(self.flattened_tokens[st-5:st+5])
                 times.append((int(0),text))
-        print("times",times)
+        # print("times",times)
 
         if len(times) == 0:
             return []
