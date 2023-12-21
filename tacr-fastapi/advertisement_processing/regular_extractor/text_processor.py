@@ -317,6 +317,8 @@ class TextProcessor:
                 print(self._conlu_to_text(self.flattened_tokens[s:e]))
                 regs2 =[["doba"]]
                 starts,_ =  self.find_all_reg(regs2,s,e)
+                if len(starts) == 0:
+                    continue
                 st = starts[0]
                 text = self._conlu_to_text(self.flattened_tokens[st-5:st+5])
                 times.append((int(0),text))
