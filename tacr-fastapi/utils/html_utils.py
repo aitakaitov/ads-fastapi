@@ -1,3 +1,4 @@
+import copy
 from bs4 import BeautifulSoup, NavigableString
 import re
 import bleach
@@ -134,9 +135,37 @@ def _clean_text(text):
 
 
 allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']
+
+def clone_and_clean_element(element):
+    element_copy = copy.deepcopy(element)
+    tags_to_remove = element_copy.find_all(allowed_tags)
+    for tag in tags_to_remove:
+        try:
+            tag.decompose()
+        except Exception:
+            pass
+    return element_copy
+
+def get_text_recursive(element, texts = []):
+    for child in element.children:
+        if isinstance(child, bs4.NavigableString):
+            string = str(child)
+            texts.append(string)
+        elif child.name is not None:
+            get_token_sequence_from_element(child, texts)    
+    
+    return texts
+
 def process_for_extraction(html: str) -> dict[str, object]:
     soup = bs4.BeautifulSoup(html)
     relevant_elements = soup.find_all(allowed_tags)
+
+    modified_elements = [clone_and_clean_element(el) for el in relevant_elements]
+    #modified_elements = relevant_elements
+
+    id_to_modified_element: dict[int, bs4.Tag] = {
+        i: el for i, el in enumerate(modified_elements)
+    } 
 
     id_to_element: dict[int, bs4.Tag] = {
         i: el for i, el in enumerate(relevant_elements)
@@ -148,13 +177,14 @@ def process_for_extraction(html: str) -> dict[str, object]:
             'text': _clean_text(el.get_text()),
             'tag': el.name
         }
-        for i, el in id_to_element.items()
+        for i, el in id_to_modified_element.items()
     ]
 
     return {
         'soup': soup,
         'texts': id_text_list,
-        'id_element_map': id_to_element 
+        'id_element_map': id_to_element,
+        'id_modified_element_map': id_to_modified_element
     }
 
 
@@ -334,15 +364,23 @@ if __name__ == '__main__':
     <html>
         <body>
             <p>
-                Lorem ipsum dolor <span>sit</span> amet, consectetuer adipiscing elit. Etiam quis quam. Duis viverra diam non justo. Mauris dictum facilisis augue.
+                <h1>Lorem ipsum dolor</h1> sit amet, consectetuer adipiscing elit. Etiam quis quam. Duis viverra diam non justo. Mauris dictum facilisis augue.
             </p>
-            <div>asdasd</div>
             <p>
                 Fusce dui leo, imperdiet in, aliquam sit amet, feugiat eu, orci. Nullam eget nisl.
             </p>
             <p>
                 Nullam eget nisl. <i>Nemo enim ipsam</i> voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
             </p>
+            <ul>
+                <li>
+                    <ul>
+                        <li> something something 1</li>
+                        <li> something something 2</li>
+                    </ul>
+                    <li> something something asasdasdasd</li>
+                </li>
+            </ul>
         </body>
     </html>
     """
