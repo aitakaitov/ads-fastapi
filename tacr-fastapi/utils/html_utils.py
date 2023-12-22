@@ -1,13 +1,11 @@
 import copy
 from bs4 import BeautifulSoup, NavigableString
 import re
-import bleach
 import bs4
-import urllib3
-
+from advertisement_processing.regular_extractor.text_processor import TextProcessor
+from advertisement_processing.regular_extractor.main import extract_from_agreements
 
 ELEMENT_ID_ATTRIBUTE = 'vilda-element-id'
-
 
 def filter_html(soup: BeautifulSoup):
     """
@@ -277,7 +275,7 @@ def get_range_in_elements(soup, elements, tokens, k=4) -> dict[str, bs4.Tag | in
         end_wrapper.append(token_elements[max_overlap_index + len(tokens)])
 
     # find the starting offset in the starting element
-    current_k = k
+    current_k = k if len(tokens) >= k else len(tokens)
     starting_offset = None
     while True:
         for i in range(current_k):
@@ -301,7 +299,7 @@ def get_range_in_elements(soup, elements, tokens, k=4) -> dict[str, bs4.Tag | in
                 break
         
     # do the same for the ending element
-    current_k = k
+    current_k = k if len(tokens) >= k else len(tokens)
     ending_offset = None
     while True:
         end_text = ''
@@ -357,6 +355,10 @@ def mark_elements(id2element, entities, soup) -> list[dict[str, object]]:
         # find all appearances
         appearances = []
         for idx, appearance in enumerate(entity['appearances']):
+            for id in appearance['ids']:
+                if isinstance(id, tuple):
+                    a = 0
+
             # find the start and end elements + offsets based on context tokens of the appearance
             data = get_range_in_elements(soup, [id2element[id] for id in appearance['ids']], appearance['context_tokens'])
 
@@ -386,28 +388,62 @@ def mark_elements(id2element, entities, soup) -> list[dict[str, object]]:
 def analyze_cookies(html):
     # get elements and texts to pass to the extractor
     processed = process_for_extraction(html)
-
-    # TODO pass the element texts to Extractor
+    textProcessor = TextProcessor(html)
+    extracted = extract_from_agreements(processed['texts'], textProcessor)
     
-    dummy_extracted_entities = [
-        {
-            'short_text': 'sit',
-            'type': 'entity one',
-            'appearances': [
+    data = []
+    for key, value in extracted.items():
+        if value is None or len(value) == 0:
+            continue
+        
+        if key == 'duration':
+            a = 0
+
+        if key == 'duration':
+            continue
+        elif isinstance(value, tuple):
+            value = [value]
+        
+        # TODO what is the short text?
+        short_text = 'placeholder short text'
+        appearances = []
+        for appearance in value:
+            ids = list(sorted(set(item[1] for item in appearance[1])))
+            context_tokens = [item[0] for item in appearance[1]]
+            appearances.append(
                 {
-                    'ids': [0, 1],
-                    'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
-                },
-                {
-                    'ids': [1, 2],
-                    'context_tokens': ['Nullam', 'eget', 'nisl', '.', 'Nullam', 'eget', 'nisl', '.'],
+                    'ids': ids,
+                    'context_tokens': context_tokens
                 }
-            ],
-        }
-    ]
+            )
+        
+        data.append(
+            {
+                'short_text': short_text,
+                'type': key,
+                'appearances': appearances
+            }
+        )
+
+    # dummy_extracted_entities = [
+    #     {
+    #         'short_text': 'sit',
+    #         'type': 'entity one',
+    #         'appearances': [
+    #             {
+    #                 'ids': [0, 1],
+    #                 'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
+    #             },
+    #             {
+    #                 'ids': [1, 2],
+    #                 'context_tokens': ['Nullam', 'eget', 'nisl', '.', 'Nullam', 'eget', 'nisl', '.'],
+    #             }
+    #         ],
+    #     }
+    # ]
 
     # modify the HTML to allow for text highlighting
-    entity_data = mark_elements(processed['id_element_map'], dummy_extracted_entities, processed['soup'])
+    entity_data = mark_elements(processed['id_element_map'], data, processed['soup'])
     modified_html = processed['soup'].prettify()
 
     return modified_html, entity_data
@@ -438,11 +474,8 @@ if __name__ == '__main__':
         </body>
     </html>
     """
-    #with open('cookies/https_autocentrum_votice_skoda_auto_cz_company_company.html', 'r', encoding='utf-8') as f:
-    #    test_html = f.read()
-    #from bs4.diagnose import diagnose
-    #diagnose(test_html)
-    #exit() 
+    with open('cookies/https_www_alza_cz_privacy_policy.html', 'r', encoding='utf-8') as f:
+        test_html = f.read()
 
     result = analyze_cookies(test_html)
     print(result[0])

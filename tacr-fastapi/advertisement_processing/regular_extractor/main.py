@@ -2,10 +2,10 @@ import argparse
 from collections import Counter, defaultdict
 import glob
 import os
-from text_processor import LEMMATIZED_FOLDER, TextProcessor
+from .text_processor import LEMMATIZED_FOLDER, TextProcessor
 from collections import OrderedDict
 
-from utils.html_utils import process_for_extraction
+# from utils.html_utils import process_for_extraction
 
 BLACK_LIST = ["Evropského parlamentu", "Rady", "EU", "ES", "GDPR", "Pplk", "Úřadu pro ochranu osobních údajů", "Úřad pro ochranu osobních údajů", "Správce", "Provozovatel", "Vámi"]
 
