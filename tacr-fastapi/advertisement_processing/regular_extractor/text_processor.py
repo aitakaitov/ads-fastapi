@@ -9,10 +9,6 @@ from dataclasses import dataclass
 import re
 LEMMATIZED_FOLDER="RegularExtractor/lemmatized"
 
-HEADING_SEPARATORS = ["HHHHHS", "HHHHHE"]
-PARAGRAPH_SEPARATORS = ["PPPPPS", "PPPPPE"]
-SPECIAL_TOKENS = HEADING_SEPARATORS + PARAGRAPH_SEPARATORS
-
 H_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
 
 @dataclass
@@ -75,11 +71,9 @@ class TextProcessor:
                     text_index += 1
 
     @staticmethod
-    def _conlu_to_text(flattened_tokens):
+    def _conllu_to_text(flattened_tokens):
         text = ''
         for token in flattened_tokens:
-            if token['form'] in SPECIAL_TOKENS:
-                continue
 
             # if token['form'] == 'Elektrická':
             #     pass
@@ -96,23 +90,16 @@ class TextProcessor:
             text += token['form'] + space
         return text
     
-    @staticmethod
-    def _remove_special_tokens(ne: NamedEntity):
-        filtered_tokens = [token for token in ne.tokens if token['form'] not in SPECIAL_TOKENS]
-        start_index = min([token["text_index"] for token in filtered_tokens])
-        end_index = max([token["text_index"] for token in filtered_tokens])
-        text = TextProcessor._conlu_to_text(filtered_tokens).strip()
-        return NamedEntity(ne.type, start_index, end_index, filtered_tokens, text)
 
     def _extract_named_entities(self):
         named_entities = {}
         
         for idx, token in enumerate(self.flattened_tokens):
-            if 'misc' in token and token['misc'] and 'NE' in token['misc'] and token['form'] not in SPECIAL_TOKENS:
+            if 'misc' in token and token['misc'] and 'NE' in token['misc']:
                 entity = token['misc']['NE']
                 entities = entity.split('-')
                 for entity in entities:
-                    entity_tuple = tuple(entity.split('_'))
+                    entity_tuple = tuple(entity.split('_'))+(self.tag_ids_for_tokens[idx],)
                     named_entity = named_entities.get(entity_tuple)
                     if named_entity:
                         named_entity.end_index = idx
@@ -194,13 +181,16 @@ class TextProcessor:
 
         self._extract_named_entities()
 
+    def get_tokens_with_tags(self, flattened_tokens):
+        return [(token['form'], self.tag_ids_for_tokens[token["text_index"]]) for token in flattened_tokens]
+
     def get_heading_for_token(self, token_index: int):
         """
         Returns the heading for the given token index.
         :param token_index: The index of the token to get the heading for.
         """
         for heading_index in range(len(self.heading_ranges) - 1):
-            if self.heading_ranges[heading_index] <= token_index <= self.heading_ranges[heading_index + 1]:
+            if self.heading_ranges[heading_index] <= token_index < self.heading_ranges[heading_index + 1]:
                 return (self.heading_ranges[heading_index], self.heading_ranges[heading_index + 1])
         return None
 
@@ -306,7 +296,7 @@ class TextProcessor:
             found = self.find_all_reg(regs,s,e)
             for s,e in zip(found[0],found[1]):
                 
-                text = self._conlu_to_text(self.flattened_tokens[s:e+1])
+                text = self._conllu_to_text(self.flattened_tokens[s:e+1])
                 numbers = re.findall(r'\d+', text)
                 if len(numbers) > 0:
                     for n in numbers:
@@ -320,7 +310,7 @@ class TextProcessor:
                 if len(starts) == 0:
                     continue
                 st = starts[0]
-                text = self._conlu_to_text(self.flattened_tokens[st-5:st+5])
+                text = self._conllu_to_text(self.flattened_tokens[st-5:st+5])
                 times.append((int(0),text))
         # print("times",times)
 
@@ -339,7 +329,7 @@ class TextProcessor:
         sentences_token_lits = [(sent_id, [w for w in self.flattened_sentences[sent_id]]) for sent_id in sent_ids]
 
         
-        sentences = [{"text":self._conlu_to_text(sent), "range":self.start_end_from_sentence(sent_id)} for sent_id,sent in sentences_token_lits] 
+        sentences = [{"text":self._conllu_to_text(sent), "range":self.start_end_from_sentence(sent_id)} for sent_id,sent in sentences_token_lits] 
 
         return sentences
     
@@ -392,7 +382,7 @@ class TextProcessor:
         return starts, ends
 
 
-    def find_all_named_entities(self, entity_type: list[str], start_range: int, end_range:int, black_list: list[str] = SPECIAL_TOKENS):
+    def find_all_named_entities(self, entity_type: list[str], start_range: int, end_range:int, black_list: list[str] = []):
         """
         Finds all named entities of the given types within the given range of tokens.
         :param entity_type: The types of the named entities to find.
@@ -426,7 +416,7 @@ class TextProcessor:
 
         return named_entities
     
-    def find_closest_named_entity(self, entity_type: list[str], start_position: int, start_range: int, end_range:int, black_list: list[str] = SPECIAL_TOKENS):
+    def find_closest_named_entity(self, entity_type: list[str], start_position: int, start_range: int, end_range:int, black_list: list[str] = []):
         """
         Finds the closest named entity of the given types within the given range of tokens.
         :param entity_type: The types of the named entities to find.

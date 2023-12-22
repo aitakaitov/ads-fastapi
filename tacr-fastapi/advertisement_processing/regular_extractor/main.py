@@ -2,12 +2,12 @@ import argparse
 from collections import Counter, defaultdict
 import glob
 import os
-from text_processor import LEMMATIZED_FOLDER, SPECIAL_TOKENS, TextProcessor
+from text_processor import LEMMATIZED_FOLDER, TextProcessor
 from collections import OrderedDict
 
 from utils.html_utils import process_for_extraction
 
-BLACK_LIST = ["Evropského parlamentu", "Rady", "EU", "ES", "GDPR", "Pplk", "Úřadu pro ochranu osobních údajů", "Úřad pro ochranu osobních údajů", "Správce", "Provozovatel", "Vámi"] + SPECIAL_TOKENS
+BLACK_LIST = ["Evropského parlamentu", "Rady", "EU", "ES", "GDPR", "Pplk", "Úřadu pro ochranu osobních údajů", "Úřad pro ochranu osobních údajů", "Správce", "Provozovatel", "Vámi"]
 
 def extract_spravce(text_processor: TextProcessor):
     input_texts = [
@@ -59,6 +59,13 @@ def extract_spravce(text_processor: TextProcessor):
                 first_company = company
                 break
 
+    if first_company is not None:
+        first_company = (first_company.text, text_processor.get_tokens_with_tags(text_processor.flattened_tokens[first_company.start_index:first_company.end_index+1]))
+
+
+    if address is not None:
+        address = (address.text, text_processor.get_tokens_with_tags(text_processor.flattened_tokens[address.start_index:address.end_index+1]))
+
     return first_company, address
 
 def extract_predavani(text_processor: TextProcessor):
@@ -91,9 +98,16 @@ def extract_predavani(text_processor: TextProcessor):
 
 
     if len(companies) > 0:
-        return list(OrderedDict.fromkeys([company.text for company in companies]))
+        companies = OrderedDict([(company.text, company) for company in reversed(companies)])
+
+        companies = reversed(companies.values())
+
+        companies = [(company.text, text_processor.get_tokens_with_tags(text_processor.flattened_tokens[company.start_index:company.end_index+1])) for company in companies]
+
+        return companies
     else:
-        return [text_processor._conlu_to_text(text_processor.flattened_tokens[range[0]:range[1]]) for range in [text_processor.get_heading_for_token(start_idx) for start_idx in start_idxs]]
+        ranges = [text_processor.get_heading_for_token(start_idx) for start_idx in start_idxs]
+        return ([text_processor._conllu_to_text(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges], [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges])
 
 
 def extract_druh(text_processor: TextProcessor):
@@ -134,19 +148,24 @@ def extract_druh(text_processor: TextProcessor):
         regs = regs_poss
         starts, ends = text_processor.find_all_reg(regs, method="sentence")
         if len(starts) > 0:
-            ret[key] = text_processor.get_whole_sentence(starts+ends)
+                sentences = text_processor.get_whole_sentence(starts+ends)
 
-    search_for("jméno",[["jméno"]])
-    search_for("příjmení",[["příjmení"]])
-    search_for("narozeni",[["datum","narození"]])
-    search_for("adresa",[["adresa"]])
-    search_for("prukaz",[["průkaz","totožnost"]])
-    search_for("ic",[["IČ"]])
-    search_for("dic",[["DIČ"]])
-    search_for("lokace",[["lokační","údaj"]])
-    search_for("spz",[["SPZ"]])
-    search_for("podpis",[["podpis"]])
-    search_for("dat_schr",[["datový","schránka"]])
+                sentence_texts = [sentence["text"] for sentence in sentences]
+                contexts = [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[sentence["range"][0]:sentence["range"][1]+1]) for sentence in sentences]
+
+                ret[key] = (sentence_texts, contexts)
+
+    search_for("Jméno",[["jméno"]])
+    search_for("Příjmení",[["příjmení"]])
+    search_for("Datum narození",[["datum","narození"]])
+    search_for("Adresa",[["adresa"]])
+    search_for("Průkaz",[["průkaz","totožnost"]])
+    search_for("IČ",[["IČ"]])
+    search_for("DIČ",[["DIČ"]])
+    search_for("Poloha",[["lokační","údaj"]])
+    search_for("SPZ",[["SPZ"]])
+    search_for("Podpis",[["podpis"]])
+    search_for("Datová schránka",[["datový","schránka"]])
 
     # SFDI nebo zpracovatel zpracovaný následující osobní údaj : SPZ , stát registrace vozidlo , v který být vozidlo registrovaný , osobní údaj o oznamovatel : jméno , příjmení , datum narození , adresa bydliště , úředně ověřený podpis nebo jeho ekvivalent ( číslo datový schránka nebo uznávaný elektronický podpis ) . Pppppe PPPPPS tento osobní údaj SFDI získávat přímo od vy nebo od třetí osoba , který zažádat o vrácení uhrazený časový poplatek 
 
@@ -170,7 +189,7 @@ def extract_druh(text_processor: TextProcessor):
 
     # duration: {'short': (0, 'údaje budeme zpracovávat pouze po dobu nezbytně nutnou k dosažení '), 'long_text': [{'text': 'Pokud jste dočetli až sem, dozvíte se, že Vaše osobní údaje budeme zpracovávat pouze po dobu nezbytně nutnou k dosažení účelu, pro který byly získány. ', 'range': (1780, 1809)}, {'text': 'Vaše osobní údaje ukládáme a zpracováváme pouze po dobu nezbytně nutnou v ohledu na účel jejich zpracování\n\n', 'range': (687, 703)}]}
     # print("DRUH: ",{k:v for k,v in ret.items() if v is not None and len(v) > 0}.keys())
-    return ret
+    return ret.items()
 
 
 
@@ -208,7 +227,8 @@ def extract_doba_zpracovani(text_processor: TextProcessor):
     
     sentences = text_processor.get_whole_sentence(starts+ends)
     short = text_processor.extract_time(sentences)
-    return {"short" : short , "long_text" : sentences}
+    contexts = [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[sentence["range"][0]:sentence["range"][1]+1]) for sentence in sentences]
+    return (short ,  contexts)
 
 def extract_pristup(text_processor: TextProcessor):
     found = []
@@ -253,7 +273,10 @@ def extract_pristup(text_processor: TextProcessor):
     # sentences containing the found tokens
     sentences = text_processor.get_whole_sentence(starts+ends)
 
-    return sentences
+    sentence_texts = [sentence["text"] for sentence in sentences]
+    contexts = [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[sentence["range"][0]:sentence["range"][1]+1]) for sentence in sentences]
+
+    return list(zip(sentence_texts, contexts))
 
 def extract_vymaz(text_processor: TextProcessor):
     found = []
@@ -288,7 +311,11 @@ def extract_vymaz(text_processor: TextProcessor):
     starts, ends = text_processor.find_all_reg(regs)
     # sentences containing the found tokens
     sentences = text_processor.get_whole_sentence(starts+ends)
-    return sentences
+    sentence_texts = [sentence["text"] for sentence in sentences]
+    contexts = [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[sentence["range"][0]:sentence["range"][1]+1]) for sentence in sentences]
+
+    return list(zip(sentence_texts, contexts))
+
 
 def extract_lhuta(text_processor: TextProcessor):
 
@@ -299,8 +326,10 @@ def extract_lhuta(text_processor: TextProcessor):
     starts, ends = text_processor.find_all_reg(regs)
     # sentences containing the found tokens
     sentences = text_processor.get_whole_sentence(starts+ends)
-    return sentences
+    sentence_texts = [sentence["text"] for sentence in sentences]
+    contexts = [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[sentence["range"][0]:sentence["range"][1]+1]) for sentence in sentences]
 
+    return list(zip(sentence_texts, contexts))
 
 def extract_from_agreements(texts: list[dict[str, object]], text_processor: TextProcessor):
     text_processor.process(texts)
@@ -308,7 +337,7 @@ def extract_from_agreements(texts: list[dict[str, object]], text_processor: Text
     company, address = extract_spravce(text_processor)
     third_companies = extract_predavani(text_processor)
     
-    # duration = extract_doba_zpracovani(text_processor)
+    duration = extract_doba_zpracovani(text_processor)
 
     access = extract_pristup(text_processor)
  
@@ -318,16 +347,20 @@ def extract_from_agreements(texts: list[dict[str, object]], text_processor: Text
     druh = extract_druh(text_processor)
 
     return {
-        "company": company.text if company is not None else None,
-        "address": address.text if address is not None else None,
+        "company": company,
+        "address": address,
         "third_companies": third_companies,
-        # "duration": duration,
+        "duration": duration,
         "access" :access,
         "delete" : delete,
         "lhuta" : lhuta,
         "druh" :druh
     }
 
+def process_html(html: str):
+    processed = process_for_extraction(html)
+    textProcessor = TextProcessor(html)
+    return extract_from_agreements(processed["texts"], textProcessor)
 
 def main(args):
     datapath = args.datadir
@@ -338,12 +371,7 @@ def main(args):
         with open(filename, "r", encoding="utf8") as file:
             html = file.read()
 
-        processed = process_for_extraction(html)
-
-        textProcessor = TextProcessor(filename)
-
-        out_dict = extract_from_agreements(processed["texts"], textProcessor)
-
+        out_dict = process_html(html)
 
         for key,value in out_dict.items():
             found_entities[key].append(value)
@@ -355,6 +383,9 @@ def main(args):
         #     print("3rd party company:", company)
 
         for key, value in out_dict.items():
+            if value is not None:
+                value = value[0] if isinstance(value, tuple) else [v[0] for v in value if isinstance(v, tuple)]
+
             print(f"{key}: {value}")
 
         if args.lemmatize:
@@ -370,7 +401,7 @@ def main(args):
         if key=="druh":
             sum = Counter()
             for site in value:
-                for d,v in site.items():
+                for d,v in site:
                     sum[d] += 1
             
             print(f"\t{sum}")

@@ -14,7 +14,7 @@ class TextProcessorTest(unittest.TestCase):
 
         heading = text_processor.get_heading_for_token(5222)
 
-        print(text_processor._conlu_to_text(text_processor.flattened_tokens[heading[0]:heading[1]]))
+        print(text_processor._conllu_to_text(text_processor.flattened_tokens[heading[0]:heading[1]]))
 
         self.assertEqual(heading, (5202,5256))
         
