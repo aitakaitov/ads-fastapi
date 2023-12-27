@@ -2,10 +2,20 @@ import copy
 from bs4 import BeautifulSoup, NavigableString
 import re
 import bs4
+import spacy_udpipe
 from advertisement_processing.regular_extractor.text_processor import TextProcessor
 from advertisement_processing.regular_extractor.main import extract_from_agreements
 
 ELEMENT_ID_ATTRIBUTE = 'vilda-element-id'
+
+
+class Tokenizer(object):
+    tokenizer = spacy_udpipe.load("cs")
+
+    @classmethod
+    def tokenize(cls, text):
+        return [token.text for token in cls.tokenizer(text)]
+
 
 def filter_html(soup: BeautifulSoup):
     """
@@ -148,15 +158,6 @@ def clone_and_clean_element(element: bs4.Tag) -> bs4.Tag:
             pass
     return element_copy
 
-# def get_text_recursive(element, texts = []):
-#     for child in element.children:
-#         if isinstance(child, bs4.NavigableString):
-#             string = str(child)
-#             texts.append(string)
-#         elif child.name is not None:
-#             get_token_sequence_from_element(child, texts)    
-    
-#     return texts
 
 def process_for_extraction(html: str) -> dict[str, object]:
     """
@@ -202,29 +203,39 @@ def process_for_extraction(html: str) -> dict[str, object]:
     }
 
 
+def tokenize_element(string: str):
+    #tokens = []
+    return Tokenizer.tokenize(string)
+    split = string.split()
+    for t in split:
+        if t.isspace() or t == '' or t == '\n':
+            continue
+        if not t[-1].isalnum():
+            tokens.append(t[:-1])
+            tokens.append(t[-1])
+        else:
+            tokens.append(t)
+    
+    return tokens
+
+
 def get_token_sequence_from_element(element, element_tokens = [], token_elements = []):
     for child in element.children:
         if isinstance(child, bs4.NavigableString):
             string = str(child)
-            split = string.split()
-            for t in split:
-                if t.isspace() or t == '' or t == '\n':
-                    continue
-                if not t[-1].isalnum():
-                    element_tokens.append(t[:-1])
-                    element_tokens.append(t[-1])
-                    token_elements.append(child)
-                    token_elements.append(child)
-                else:
-                    element_tokens.append(t)
-                    token_elements.append(child)
+
+            tokens = tokenize_element(string)
+            elements = [child for _ in tokens]
+
+            element_tokens.extend(tokens)
+            token_elements.extend(elements)
         elif child.name is not None:
             get_token_sequence_from_element(child, element_tokens, token_elements)    
     
     return element_tokens, token_elements
 
 
-def get_range_in_elements(soup, elements, tokens, k=4) -> dict[str, bs4.Tag | int]:
+def get_range_in_elements(soup, elements, tokens, k=4, jaccard_min=0.5) -> dict[str, bs4.Tag | int]:
     """
     Finds the start and end of a sequence of tokens in a list of elements.
 
@@ -260,67 +271,89 @@ def get_range_in_elements(soup, elements, tokens, k=4) -> dict[str, bs4.Tag | in
                 # exit on exact match
                 break
     
-    # wrap the starting bs4.NavigableString element in a span
-    start_wrapper = soup.new_tag('span')
-    token_elements[max_overlap_index].insert_before(start_wrapper)
-    start_wrapper.append(token_elements[max_overlap_index])
+    print(max_jaccard)
 
-    # if the start and end are in the same elements, do nothing
-    if token_elements[max_overlap_index] == token_elements[max_overlap_index + len(tokens)]:
-        end_wrapper = start_wrapper
-    else:
-        # otherwise wrap the ending element
-        end_wrapper = soup.new_tag('span')
-        token_elements[max_overlap_index + len(tokens)].insert_before(end_wrapper)
-        end_wrapper.append(token_elements[max_overlap_index + len(tokens)])
+    # if we did not find a good enough match
+    # we pretend the entity starts at the beginning 
+    # of the first element and ends at the end of the last
+    if max_jaccard < jaccard_min:
+        start_wrapper = soup.new_tag('span')
+        token_elements[0].insert_before(start_wrapper)
+        start_wrapper.append(token_elements[0])
 
-    # find the starting offset in the starting element
-    current_k = k if len(tokens) >= k else len(tokens)
-    starting_offset = None
-    while True:
-        for i in range(current_k):
-            if i == 0:
-                start_text = tokens[i]
-            elif tokens[i].isalnum():
-                start_text += ' ' + tokens[i]
-            else:
-                start_text += tokens[i]
-
-        try:
-            starting_offset = start_wrapper.get_text().index(start_text)
-            break
-        except Exception:
-            # if K is too high, lower it
-            if current_k > 1:
-                current_k -= 1
-                continue
-            else:
-                starting_offset = -1
-                break
+        if len(token_elements) == 0:
+            end_wrapper = start_wrapper
+        else:
+            end_wrapper = soup.new_tag('span')
+            token_elements[-1].insert_before(end_wrapper)
+            end_wrapper.append(token_elements[-1])
         
-    # do the same for the ending element
-    current_k = k if len(tokens) >= k else len(tokens)
-    ending_offset = None
-    while True:
-        end_text = ''
-        for i in range(current_k):
-            if i == 0:
-                end_text = tokens[-current_k]
-            elif tokens[-current_k + i].isalnum():
-                end_text += ' ' + tokens[-current_k + i]
-            else:
-                end_text += tokens[-current_k + i]
-        
-        try:
-            ending_offset = end_wrapper.get_text().index(end_text) + len(end_text)
-            break
-        except Exception:
-            if current_k > 1:
-                current_k -= 1
-                continue
-            else:
-                ending_offset = -1
+        # pretend we did not locate the offsets
+        starting_offset = -1
+        ending_offset = -1
+    
+    else: 
+        # wrap the starting bs4.NavigableString element in a span
+        start_wrapper = soup.new_tag('span')
+        token_elements[max_overlap_index].insert_before(start_wrapper)
+        start_wrapper.append(token_elements[max_overlap_index])
+
+        # if the start and end are in the same elements, do nothing
+        if token_elements[max_overlap_index] == token_elements[max_overlap_index + len(tokens)]:
+            end_wrapper = start_wrapper
+        else:
+            # otherwise wrap the ending element
+            end_wrapper = soup.new_tag('span')
+            token_elements[max_overlap_index + len(tokens)].insert_before(end_wrapper)
+            end_wrapper.append(token_elements[max_overlap_index + len(tokens)])
+
+        # find the starting offset in the starting element
+        current_k = k if len(tokens) >= k else len(tokens)
+        starting_offset = None
+        while True:
+            for i in range(current_k):
+                if i == 0:
+                    start_text = tokens[i]
+                elif tokens[i].isalnum():
+                    start_text += ' ' + tokens[i]
+                else:
+                    start_text += tokens[i]
+
+            try:
+                starting_offset = start_wrapper.get_text().index(start_text)
                 break
+            except Exception:
+                # if K is too high, lower it
+                if current_k > 1:
+                    current_k -= 1
+                    continue
+                else:
+                    starting_offset = -1
+                    break
+            
+        # do the same for the ending element
+        current_k = k if len(tokens) >= k else len(tokens)
+        ending_offset = None
+        while True:
+            end_text = ''
+            for i in range(current_k):
+                if i == 0:
+                    end_text = tokens[-current_k]
+                elif tokens[-current_k + i].isalnum():
+                    end_text += ' ' + tokens[-current_k + i]
+                else:
+                    end_text += tokens[-current_k + i]
+            
+            try:
+                ending_offset = end_wrapper.get_text().index(end_text) + len(end_text)
+                break
+            except Exception:
+                if current_k > 1:
+                    current_k -= 1
+                    continue
+                else:
+                    ending_offset = -1
+                    break
     
     # if we did not find the starting or ending offsets, set them to the start/end of the respective element
     if starting_offset == -1:
@@ -352,13 +385,11 @@ def mark_elements(id2element, entities, soup) -> list[dict[str, object]]:
             'type': entity['type'],
             'short_text': entity['short_text']
         }
+        print('---- ' + e_data['type'] + ' ----')
         # find all appearances
         appearances = []
         for idx, appearance in enumerate(entity['appearances']):
-            for id in appearance['ids']:
-                if isinstance(id, tuple):
-                    a = 0
-
+            print(f'{idx}: ', end='')
             # find the start and end elements + offsets based on context tokens of the appearance
             data = get_range_in_elements(soup, [id2element[id] for id in appearance['ids']], appearance['context_tokens'])
 

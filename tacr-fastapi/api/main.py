@@ -16,7 +16,7 @@ from advertisement_processing import attribution
 from fastapi import FastAPI, Depends, HTTPException
 import transformers
 import torch
-import nltk
+import spacy_udpipe
 
 from utils.html_utils import analyze_cookies
 
@@ -28,8 +28,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = transformers.AutoModelForSequenceClassification.from_pretrained(Config.MODEL_FILE).to(device)
 tokenizer = transformers.AutoTokenizer.from_pretrained(Config.MODEL_FILE)
 
-nltk.download('punkt')
-
+spacy_udpipe.download("cs")
 
 def get_db():
     db = SessionLocal()
