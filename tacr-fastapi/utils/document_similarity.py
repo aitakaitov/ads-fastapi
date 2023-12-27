@@ -16,10 +16,6 @@ def document_to_minhash(document, k=5, num_perm=512):
     return minhash
 
 
-
-
 def are_documents_same(minhash1: datasketch.MinHash, minhash2: datasketch.MinHash, threshold=0.95):
-    print(f'> {threshold} => are same')
     print(minhash1.jaccard(minhash2))
     return minhash1.jaccard(minhash2) > threshold
-

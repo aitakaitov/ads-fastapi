@@ -393,17 +393,24 @@ def analyze_cookies(html):
     
     data = []
     for key, value in extracted.items():
+        # What to do with entity not found?
         if value is None or len(value) == 0:
             continue
         
-        if key == 'duration':
-            a = 0
-
-        if key == 'duration':
-            continue
-        elif isinstance(value, tuple):
+        # Sometimes a list of tuples is passed, sometimes a single tuple - wrap single tuple in a list
+        if isinstance(value, tuple):
             value = [value]
         
+        # Duration seems to have a weird format - excessive nesting in the token section
+        if key == 'duration':
+            new_value = []
+            for appearance in value:
+                new_value.append(
+                    (appearance[0],
+                     appearance[1][0])
+                )
+            value = new_value
+
         # TODO what is the short text?
         short_text = 'placeholder short text'
         appearances = []
@@ -424,23 +431,6 @@ def analyze_cookies(html):
                 'appearances': appearances
             }
         )
-
-    # dummy_extracted_entities = [
-    #     {
-    #         'short_text': 'sit',
-    #         'type': 'entity one',
-    #         'appearances': [
-    #             {
-    #                 'ids': [0, 1],
-    #                 'context_tokens': ['Lorem', 'ipsum', 'dolor', 'sit', 'amet'],
-    #             },
-    #             {
-    #                 'ids': [1, 2],
-    #                 'context_tokens': ['Nullam', 'eget', 'nisl', '.', 'Nullam', 'eget', 'nisl', '.'],
-    #             }
-    #         ],
-    #     }
-    # ]
 
     # modify the HTML to allow for text highlighting
     entity_data = mark_elements(processed['id_element_map'], data, processed['soup'])

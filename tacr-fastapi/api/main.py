@@ -71,9 +71,9 @@ async def analyze(page: Page, db: Session = Depends(get_db)):
             return CookiesAnalysis(
                 url=page.url, 
                 entities=[
-                    EntityInfo(short_Text=e['short_text'], entity=e['type']) for e in json.loads(analysis.entity_data_json)
+                    EntityInfo(short_text=e['short_text'], entity=e['type']) for e in json.loads(analysis.entity_data_json)
                 ], 
-                page_to_render=analysis.processed_html
+                page_to_render=PageToRender(html=analysis.processed_html)
             )
     
     # the URL is not cached
@@ -94,7 +94,7 @@ async def analyze(page: Page, db: Session = Depends(get_db)):
         entities=[
             EntityInfo(short_text=e['short_text'], entity=e['type']) for e in entity_data
         ], 
-        page_to_render=modified_html
+        page_to_render=PageToRender(html=modified_html)
     )
 
 
