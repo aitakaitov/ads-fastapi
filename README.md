@@ -10,6 +10,40 @@ The server inside the container runs on <code>0.0.0.0:8001</code>.
 
 See SwaggerDoc at <code>http://localhost:8001/docs#</code>
 
+## Interface for entity highlighting
+Entities are a list of dictionaries:
+```python
+[
+    {
+        # type of entity
+        'type': str,
+        # short text description
+        'short_text': str,
+        # list of relevant appearances to highlight
+        'appearances':
+        [
+            {
+                # which attribute identifies the start and end tags
+                'attribute': str,
+                # what value does the start tag have as the attribute above 
+                'attr_start_value': str,
+                # what value does the end tag have as the attribute above 
+                'attr_end_value': str,
+                # offset in characters from the beginning of the start tag
+                'start_offset': int,
+                # offset in characters from the beginning of the end tag
+                'end_offset': int
+            },
+            ...
+        ]
+    },
+    ...
+]
+```
+
+`utils.html_utils.analyze_cookies` returns `(modified_html, entities)`, where the HTML is modified to include additional span tags, and entities is a list, which follows the interface described above.
+
+
 ## API for entity extraction
 * `utils.html_utils.analyze_cookies(html: str)` takes HTML code as input.
 * it then calls `process_for_extraction(html: str)`, which returns
