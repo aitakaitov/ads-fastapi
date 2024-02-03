@@ -14,6 +14,7 @@ from advertisement_processing import classification
 from advertisement_processing import attribution
 
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import transformers
 import torch
 import spacy_udpipe
@@ -22,6 +23,14 @@ from utils.html_utils import analyze_cookies
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*']
+)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
