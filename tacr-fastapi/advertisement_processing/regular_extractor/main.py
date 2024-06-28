@@ -189,7 +189,7 @@ def extract_druh(text_processor: TextProcessor):
 
     # duration: {'short': (0, 'údaje budeme zpracovávat pouze po dobu nezbytně nutnou k dosažení '), 'long_text': [{'text': 'Pokud jste dočetli až sem, dozvíte se, že Vaše osobní údaje budeme zpracovávat pouze po dobu nezbytně nutnou k dosažení účelu, pro který byly získány. ', 'range': (1780, 1809)}, {'text': 'Vaše osobní údaje ukládáme a zpracováváme pouze po dobu nezbytně nutnou v ohledu na účel jejich zpracování\n\n', 'range': (687, 703)}]}
     # print("DRUH: ",{k:v for k,v in ret.items() if v is not None and len(v) > 0}.keys())
-    return ret.items()
+    return ret
 
 
 

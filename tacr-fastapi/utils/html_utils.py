@@ -434,6 +434,8 @@ def analyze_cookies(html):
         
         # Duration seems to have a weird format - excessive nesting in the token section
         if key == 'duration':
+            continue
+        if key == 'duration' and len(value[0][1]) > 0:
             new_value = []
             for appearance in value:
                 new_value.append(
@@ -443,7 +445,15 @@ def analyze_cookies(html):
             value = new_value
 
         # TODO what is the short text?
-        short_text = 'placeholder short text'
+        if isinstance(value, dict):
+            short_text = ", ".join(value.keys())
+            # value = list(value.values())
+            new_values = []
+            for texts, tags in value.values():
+                new_values.extend(list(zip(texts, tags)))
+            value = new_values
+        else:
+            short_text = 'placeholder short text'
         appearances = []
         for appearance in value:
             ids = list(sorted(set(item[1] for item in appearance[1])))
