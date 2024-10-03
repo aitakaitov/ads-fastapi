@@ -107,7 +107,7 @@ def extract_predavani(text_processor: TextProcessor):
         return companies
     else:
         ranges = [text_processor.get_heading_for_token(start_idx) for start_idx in start_idxs]
-        return ([text_processor._conllu_to_text(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges], [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges])
+        return list(zip(*([text_processor._conllu_to_text(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges], [text_processor.get_tokens_with_tags(text_processor.flattened_tokens[range[0]:range[1]]) for range in ranges])))
 
 
 def extract_druh(text_processor: TextProcessor):
