@@ -34,6 +34,15 @@ app.add_middleware(
     allow_headers=['*']
 )
 
+category_names = {"company": "Správce údajů",
+                  "address": "Adresa správce",
+                  "third_companies": "Třetí strany",
+                  "duration": "Doba uchování",
+                  "access": "Právo přístupu",
+                  "delete": "Právo výmazu",
+                  "lhuta": "Lhůta žádosti",
+                  "druh": "Kategorie údajů"}
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 model = transformers.AutoModelForSequenceClassification.from_pretrained(Config.MODEL_FILE).to(device)
@@ -100,7 +109,7 @@ async def analyze(page: Page, db: Session = Depends(get_db)):
     return CookiesAnalysis(
         url=page.url, 
         entities=[
-            EntityInfo(short_text=e['short_text'], entity=e['type']) for e in entity_data
+            EntityInfo(short_text=e['short_text'], entity=category_names[e['type']]) for e in entity_data
         ], 
         page_to_render=PageToRender(html=modified_html)
     )
