@@ -88,7 +88,7 @@ async def analyze(page: Page, db: Session = Depends(get_db)):
             return CookiesAnalysis(
                 url=page.url, 
                 entities=[
-                    EntityInfo(short_text=e['short_text'], entity=e['type']) for e in json.loads(analysis.entity_data_json)
+                    EntityInfo(short_text=e['short_text'], entity=category_names[e['type']]) for e in json.loads(analysis.entity_data_json)
                 ], 
                 page_to_render=PageToRender(html=analysis.processed_html)
             )
